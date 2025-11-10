@@ -31,9 +31,19 @@ def create_app(config_name='development'):
     app.register_blueprint(mechanic_bp, url_prefix='/mechanics')
     app.register_blueprint(service_ticket_bp, url_prefix='/service-tickets')
     
-    # Create database tables
+    # Create database tables with error handling
     with app.app_context():
-        db.create_all()
+        try:
+            db.create_all()
+            print("✓ Database tables created successfully")
+        except Exception as e:
+            print(f"⚠️  Database connection failed: {e}")
+            print("📝 Please check your MySQL configuration:")
+            print("   1. Ensure MySQL server is running")
+            print("   2. Create database: CREATE DATABASE mechanicshopdata;")
+            print("   3. Check MySQL root password")
+            print("   4. Update .env file with correct DATABASE_URL")
+            print("   5. Or uncomment SQLite fallback in .env")
     
     @app.route('/')
     def index():
@@ -43,7 +53,8 @@ def create_app(config_name='development'):
                 'customers': '/customers',
                 'mechanics': '/mechanics',
                 'service_tickets': '/service-tickets'
-            }
+            },
+            'database_status': 'Check console for database connection status'
         }
     
     return app
