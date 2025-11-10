@@ -1,4 +1,4 @@
-"""Service Ticket blueprint initialization."""
+"""Service ticket blueprint initialization."""
 
 from flask import Blueprint
 
