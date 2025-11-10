@@ -48,5 +48,5 @@ customers_schema = CustomerSchema(many=True)
 customer_simple_schema = CustomerSchema(exclude=['service_tickets'])
 customers_simple_schema = CustomerSchema(many=True, exclude=['service_tickets'])
 
-# Login schema: only email and password
+# Login schema: email and password
 login_schema = CustomerSchema(only=['email', 'password'])

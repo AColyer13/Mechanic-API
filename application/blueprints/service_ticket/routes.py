@@ -5,7 +5,7 @@ from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 from application.extensions import db
-from application.models import ServiceTicket, Mechanic, Customer
+from application.models import ServiceTicket, Mechanic, Customer, Inventory
 from .schemas import service_ticket_schema, service_tickets_schema, service_ticket_simple_schema, service_tickets_simple_schema
 from . import service_ticket_bp
 
@@ -156,3 +156,23 @@ def get_tickets_by_mechanic(mechanic_id):
         return service_tickets_simple_schema.dump(mechanic.service_tickets), 200
     except Exception as e:
         return {'error': 'An error occurred while retrieving tickets'}, 500
+
+
+@service_ticket_bp.route('/<int:ticket_id>/add-part/<int:inventory_id>', methods=['PUT'])
+def add_part_to_ticket(ticket_id, inventory_id):
+    """Add a single inventory part to a service ticket."""
+    try:
+        ticket = ServiceTicket.query.get(ticket_id)
+        inventory = Inventory.query.get(inventory_id)
+        if not ticket or not inventory:
+            return {'error': 'Service ticket or inventory item not found'}, 404
+        
+        if inventory in ticket.inventories:
+            return {'error': 'Part already added to this ticket'}, 409
+        
+        ticket.inventories.append(inventory)
+        db.session.commit()
+        return {'message': f'Part {inventory_id} added to ticket {ticket_id}'}, 200
+    except Exception as e:
+        db.session.rollback()
+        return {'error': 'An error occurred while adding the part'}, 500
