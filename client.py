@@ -9,8 +9,7 @@ Run this while the Flask API is running on localhost:5000
 
 import requests
 import json
-from datetime import datetime, date
-import sys
+from datetime import datetime
 
 BASE_URL = "http://localhost:5000"
 HEADERS = {"Content-Type": "application/json"}
