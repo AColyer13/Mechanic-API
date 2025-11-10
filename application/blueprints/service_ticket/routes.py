@@ -1,13 +1,13 @@
-"""Service Ticket routes for CRUD operations and mechanic assignment."""
+"""Service ticket routes for CRUD operations and mechanic assignment."""
 
-from flask import request, jsonify
+from flask import request
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError
-from datetime import datetime
 from application.extensions import db
 from application.models import ServiceTicket, Mechanic, Customer
 from .schemas import service_ticket_schema, service_tickets_schema, service_ticket_simple_schema, service_tickets_simple_schema
 from . import service_ticket_bp
+from application.auth import token_required
 
 
 @service_ticket_bp.route('/', methods=['POST'])
@@ -21,8 +21,8 @@ def create_service_ticket():
         db.session.add(ticket_data)
         db.session.commit()
         
-        # Return serialized service ticket with relationships
-        return service_ticket_schema.dump(ticket_data), 201
+        # Return serialized ticket
+        return service_ticket_simple_schema.dump(ticket_data), 201
         
     except ValidationError as err:
         return {'errors': err.messages}, 400
@@ -36,7 +36,7 @@ def get_service_tickets():
     """Retrieve all service tickets."""
     try:
         tickets = ServiceTicket.query.all()
-        return service_tickets_schema.dump(tickets), 200
+        return service_tickets_simple_schema.dump(tickets), 200
     except Exception as e:
         return {'error': 'An error occurred while retrieving service tickets'}, 500
 
@@ -129,24 +129,25 @@ def remove_mechanic_from_ticket(ticket_id, mechanic_id):
 
 
 @service_ticket_bp.route('/<int:ticket_id>', methods=['PUT'])
-def update_service_ticket(ticket_id):
-    """Update a service ticket."""
+@token_required
+def update_service_ticket(token_customer_id, ticket_id):
+    """Update a specific service ticket."""
     try:
         ticket = ServiceTicket.query.get(ticket_id)
         if not ticket:
             return {'error': 'Service ticket not found'}, 404
         
+        # Check ownership
+        if ticket.customer_id != token_customer_id:
+            return {'error': 'Unauthorized to update this ticket'}, 403
+        
         # Validate and update ticket data
         ticket_data = service_ticket_schema.load(request.json, instance=ticket, partial=True)
-        
-        # If status is being updated to 'Completed', set completed_at
-        if 'status' in request.json and request.json['status'] == 'Completed':
-            ticket_data.completed_at = datetime.utcnow()
         
         # Save changes
         db.session.commit()
         
-        return service_ticket_schema.dump(ticket_data), 200
+        return service_ticket_simple_schema.dump(ticket_data), 200
         
     except ValidationError as err:
         return {'errors': err.messages}, 400
@@ -156,15 +157,17 @@ def update_service_ticket(ticket_id):
 
 
 @service_ticket_bp.route('/<int:ticket_id>', methods=['DELETE'])
-def delete_service_ticket(ticket_id):
-    """Delete a service ticket."""
+@token_required
+def delete_service_ticket(token_customer_id, ticket_id):
+    """Delete a specific service ticket."""
     try:
         ticket = ServiceTicket.query.get(ticket_id)
         if not ticket:
             return {'error': 'Service ticket not found'}, 404
         
-        # Remove all mechanic assignments before deleting
-        ticket.mechanics.clear()
+        # Check ownership
+        if ticket.customer_id != token_customer_id:
+            return {'error': 'Unauthorized to delete this ticket'}, 403
         
         db.session.delete(ticket)
         db.session.commit()
