@@ -91,10 +91,8 @@ def delete_mechanic(mechanic_id):
             return {'error': 'Mechanic not found'}, 404
         
         # Check if mechanic is assigned to any service tickets
-        assigned_tickets = mechanic.service_tickets.all()
-        if assigned_tickets:
-            blocking_tickets = [{'id': t.id, 'description': t.description} for t in assigned_tickets]
-            return {'error': 'Cannot delete mechanic who is assigned to service tickets', 'assigned_tickets': blocking_tickets}, 409
+        if mechanic.service_tickets.count() > 0:
+            return {'error': 'Cannot delete mechanic who is assigned to service tickets'}, 409
         
         db.session.delete(mechanic)
         db.session.commit()

@@ -4,13 +4,11 @@ A RESTful API for managing a mechanic shop built with Flask using the Applicatio
 
 ## Features
 
-- **Customer Management**: Full CRUD operations for customers with authentication
+- **Customer Management**: Full CRUD operations for customers
 - **Mechanic Management**: Full CRUD operations for mechanics
 - **Service Ticket Management**: Create, read, update, and delete service tickets
-- **Inventory Management**: Track parts and their association with service tickets
 - **Mechanic Assignment**: Assign and remove mechanics from service tickets
-- **Authentication**: JWT-based login for customers with protected routes
-- **Database Relationships**: Many-to-many relationships between mechanics, service tickets, and inventory
+- **Database Relationships**: Many-to-many relationships between mechanics and service tickets
 - **Input Validation**: Comprehensive validation using Marshmallow schemas
 - **Error Handling**: Proper error responses and status codes
 
@@ -74,14 +72,10 @@ If you can't activate the virtual environment due to execution policy, use the P
 │       │   ├── __init__.py        # Mechanic blueprint initialization
 │       │   ├── routes.py          # Mechanic CRUD routes
 │       │   └── schemas.py         # Mechanic Marshmallow schemas
-│       ├── /inventory
-│       │   ├── __init__.py        # Inventory blueprint initialization
-│       │   ├── routes.py          # Inventory CRUD routes
-│       │   └── schemas.py         # Inventory Marshmallow schemas
-│       ├── /service_ticket
-│       │   ├── __init__.py        # Service ticket blueprint initialization
-│       │   ├── routes.py          # Service ticket routes
-│       │   └── schemas.py         # Service ticket Marshmallow schemas
+│       └── /service_ticket
+│           ├── __init__.py        # Service ticket blueprint initialization
+│           ├── routes.py          # Service ticket routes
+│           └── schemas.py         # Service ticket Marshmallow schemas
 ├── app.py                         # Main application entry point
 ├── config.py                      # Configuration settings
 ├── requirements.txt               # Python dependencies
@@ -136,14 +130,6 @@ The API will be available at `http://localhost:5000`
 - `PUT /mechanics/<id>` - Update a mechanic
 - `DELETE /mechanics/<id>` - Delete a mechanic
 
-### Inventory (`/inventory`)
-
-- `POST /inventory/` - Add a new part to inventory
-- `GET /inventory/` - Get all inventory items
-- `GET /inventory/<id>` - Get a specific inventory item
-- `PUT /inventory/<id>` - Update an inventory item
-- `DELETE /inventory/<id>` - Delete an inventory item
-
 ### Service Tickets (`/service-tickets`)
 
 - `POST /service-tickets/` - Create a new service ticket
@@ -153,13 +139,12 @@ The API will be available at `http://localhost:5000`
 - `DELETE /service-tickets/<id>` - Delete a service ticket
 - `PUT /service-tickets/<ticket_id>/assign-mechanic/<mechanic_id>` - Assign mechanic to ticket
 - `PUT /service-tickets/<ticket_id>/remove-mechanic/<mechanic_id>` - Remove mechanic from ticket
-- `PUT /service-tickets/<ticket_id>/add-part/<inventory_id>` - Add part to ticket
 - `GET /service-tickets/customer/<customer_id>` - Get all tickets for a customer
 - `GET /service-tickets/mechanic/<mechanic_id>` - Get all tickets for a mechanic
 
 ## Sample API Usage
 
-### Create a Customer (with password)
+### Create a Customer
 ```bash
 curl -X POST http://localhost:5000/customers/ \
   -H "Content-Type: application/json" \
@@ -168,42 +153,8 @@ curl -X POST http://localhost:5000/customers/ \
     "last_name": "Doe",
     "email": "john.doe@email.com",
     "phone": "555-1234",
-    "address": "123 Main St",
-    "password": "securepassword"
+    "address": "123 Main St"
   }'
-```
-
-### Login a Customer
-```bash
-curl -X POST http://localhost:5000/customers/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "john.doe@email.com",
-    "password": "securepassword"
-  }'
-# Returns a token for authenticated requests
-```
-
-### Get My Service Tickets (Authenticated)
-```bash
-curl -X GET http://localhost:5000/customers/my-tickets \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE"
-```
-
-### Update a Customer (Authenticated)
-```bash
-curl -X PUT http://localhost:5000/customers/1 \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "phone": "555-5678"
-  }'
-```
-
-### Delete a Customer (Error if has tickets)
-```bash
-curl -X DELETE http://localhost:5000/customers/1
-# Returns details of blocking tickets if any
 ```
 
 ### Create a Mechanic
@@ -221,29 +172,6 @@ curl -X POST http://localhost:5000/mechanics/ \
   }'
 ```
 
-### Assign Mechanic to Service Ticket
-```bash
-curl -X PUT http://localhost:5000/service-tickets/1/assign-mechanic/1
-# Automatically sets status to 'In Progress' if 'Open'
-```
-
-### Update Service Ticket Status
-```bash
-curl -X PUT http://localhost:5000/service-tickets/1 \
-  -H "Content-Type: application/json" \
-  -d '{
-    "status": "Completed",
-    "actual_cost": 350.00
-  }'
-# Sets completed_at timestamp when status changes to 'Completed'
-```
-
-### Delete a Mechanic (Error if assigned)
-```bash
-curl -X DELETE http://localhost:5000/mechanics/1
-# Returns details of assigned tickets if any
-```
-
 ### Create a Service Ticket
 ```bash
 curl -X POST http://localhost:5000/service-tickets/ \
@@ -259,29 +187,9 @@ curl -X POST http://localhost:5000/service-tickets/ \
   }'
 ```
 
-### Get Tickets by Customer
+### Assign Mechanic to Service Ticket
 ```bash
-curl -X GET http://localhost:5000/service-tickets/customer/1
-```
-
-### Add Part to Inventory
-```bash
-curl -X POST http://localhost:5000/inventory/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Oil Filter",
-    "price": 12.99
-  }'
-```
-
-### Get All Inventory Items
-```bash
-curl -X GET http://localhost:5000/inventory/
-```
-
-### Add Part to Service Ticket
-```bash
-curl -X PUT http://localhost:5000/service-tickets/1/add-part/1
+curl -X PUT http://localhost:5000/service-tickets/1/assign-mechanic/1
 ```
 
 ## Database Models
@@ -320,11 +228,6 @@ curl -X PUT http://localhost:5000/service-tickets/1/add-part/1
 - `created_at`: Timestamp of creation
 - `completed_at`: Timestamp when completed
 
-### Inventory
-- `id`: Primary key
-- `name`: Name of the part (required)
-- `price`: Price of the part (required, float)
-
 ## Testing with Postman
 
 Import the following collection structure in Postman:
@@ -353,13 +256,6 @@ Import the following collection structure in Postman:
    - Remove Mechanic from Ticket
    - Get Customer Tickets
    - Get Mechanic Tickets
-
-4. **Inventory Collection**
-   - Add Part to Inventory
-   - Get All Inventory Items
-   - Get Inventory Item by ID
-   - Update Inventory Item
-   - Delete Inventory Item
 
 ## Development Notes
 

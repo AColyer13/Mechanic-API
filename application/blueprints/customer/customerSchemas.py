@@ -21,7 +21,6 @@ class CustomerSchema(SQLAlchemyAutoSchema):
     email = fields.Email(required=True)
     phone = fields.Str(validate=validate.Length(max=20))
     address = fields.Str(validate=validate.Length(max=200))
-    password = fields.Str(required=True, validate=validate.Length(min=6), load_only=True)  # For input only, not dumped
     
     # Read-only fields
     id = fields.Int(dump_only=True)
@@ -47,6 +46,3 @@ customers_schema = CustomerSchema(many=True)
 # Schema without service tickets for simpler responses
 customer_simple_schema = CustomerSchema(exclude=['service_tickets'])
 customers_simple_schema = CustomerSchema(many=True, exclude=['service_tickets'])
-
-# Login schema: email and password
-login_schema = CustomerSchema(only=['email', 'password'])

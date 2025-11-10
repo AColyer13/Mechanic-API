@@ -1,11 +1,11 @@
-"""Service ticket routes for CRUD operations and mechanic assignment."""
+"""Service Ticket routes for CRUD operations and mechanic assignment."""
 
-from flask import request
+from flask import request, jsonify
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 from application.extensions import db
-from application.models import ServiceTicket, Mechanic, Customer, Inventory
+from application.models import ServiceTicket, Mechanic, Customer
 from .schemas import service_ticket_schema, service_tickets_schema, service_ticket_simple_schema, service_tickets_simple_schema
 from . import service_ticket_bp
 
@@ -14,15 +14,16 @@ from . import service_ticket_bp
 def create_service_ticket():
     """Create a new service ticket."""
     try:
-        # Validate customer exists
-        customer_id = request.json.get('customer_id')
-        if not Customer.query.get(customer_id):
-            return {'error': 'Customer not found'}, 404
-        
+        # Validate and deserialize input
         ticket_data = service_ticket_schema.load(request.json)
+        
+        # Save to database
         db.session.add(ticket_data)
         db.session.commit()
-        return service_ticket_simple_schema.dump(ticket_data), 201
+        
+        # Return serialized service ticket with relationships
+        return service_ticket_schema.dump(ticket_data), 201
+        
     except ValidationError as err:
         return {'errors': err.messages}, 400
     except Exception as e:
@@ -47,27 +48,106 @@ def get_service_ticket(ticket_id):
         ticket = ServiceTicket.query.get(ticket_id)
         if not ticket:
             return {'error': 'Service ticket not found'}, 404
+            
         return service_ticket_schema.dump(ticket), 200
     except Exception as e:
         return {'error': 'An error occurred while retrieving the service ticket'}, 500
 
 
+@service_ticket_bp.route('/<int:ticket_id>/assign-mechanic/<int:mechanic_id>', methods=['PUT'])
+def assign_mechanic_to_ticket(ticket_id, mechanic_id):
+    """Assign a mechanic to a service ticket."""
+    try:
+        # Get the service ticket
+        ticket = ServiceTicket.query.get(ticket_id)
+        if not ticket:
+            return {'error': 'Service ticket not found'}, 404
+        
+        # Get the mechanic
+        mechanic = Mechanic.query.get(mechanic_id)
+        if not mechanic:
+            return {'error': 'Mechanic not found'}, 404
+        
+        # Check if mechanic is already assigned
+        if mechanic in ticket.mechanics:
+            return {'error': 'Mechanic is already assigned to this service ticket'}, 409
+        
+        # Assign mechanic to ticket
+        ticket.mechanics.append(mechanic)
+        
+        # Update ticket status if it's still Open
+        if ticket.status == 'Open':
+            ticket.status = 'In Progress'
+        
+        db.session.commit()
+        
+        return {
+            'message': f'Mechanic {mechanic.first_name} {mechanic.last_name} assigned to service ticket {ticket_id}',
+            'service_ticket': service_ticket_schema.dump(ticket)
+        }, 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return {'error': 'An error occurred while assigning the mechanic'}, 500
+
+
+@service_ticket_bp.route('/<int:ticket_id>/remove-mechanic/<int:mechanic_id>', methods=['PUT'])
+def remove_mechanic_from_ticket(ticket_id, mechanic_id):
+    """Remove a mechanic from a service ticket."""
+    try:
+        # Get the service ticket
+        ticket = ServiceTicket.query.get(ticket_id)
+        if not ticket:
+            return {'error': 'Service ticket not found'}, 404
+        
+        # Get the mechanic
+        mechanic = Mechanic.query.get(mechanic_id)
+        if not mechanic:
+            return {'error': 'Mechanic not found'}, 404
+        
+        # Check if mechanic is assigned
+        if mechanic not in ticket.mechanics:
+            return {'error': 'Mechanic is not assigned to this service ticket'}, 404
+        
+        # Remove mechanic from ticket
+        ticket.mechanics.remove(mechanic)
+        
+        # Update ticket status if no mechanics are left and ticket is in progress
+        if ticket.status == 'In Progress' and ticket.mechanics.count() == 0:
+            ticket.status = 'Open'
+        
+        db.session.commit()
+        
+        return {
+            'message': f'Mechanic {mechanic.first_name} {mechanic.last_name} removed from service ticket {ticket_id}',
+            'service_ticket': service_ticket_schema.dump(ticket)
+        }, 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return {'error': 'An error occurred while removing the mechanic'}, 500
+
+
 @service_ticket_bp.route('/<int:ticket_id>', methods=['PUT'])
 def update_service_ticket(ticket_id):
-    """Update a specific service ticket."""
+    """Update a service ticket."""
     try:
         ticket = ServiceTicket.query.get(ticket_id)
         if not ticket:
             return {'error': 'Service ticket not found'}, 404
         
-        update_data = service_ticket_schema.load(request.json, instance=ticket, partial=True)
+        # Validate and update ticket data
+        ticket_data = service_ticket_schema.load(request.json, instance=ticket, partial=True)
         
-        # Set completed_at if status changes to 'Completed'
-        if 'status' in request.json and request.json['status'] == 'Completed' and ticket.status != 'Completed':
-            update_data.completed_at = datetime.utcnow()
+        # If status is being updated to 'Completed', set completed_at
+        if 'status' in request.json and request.json['status'] == 'Completed':
+            ticket_data.completed_at = datetime.utcnow()
         
+        # Save changes
         db.session.commit()
-        return service_ticket_simple_schema.dump(update_data), 200
+        
+        return service_ticket_schema.dump(ticket_data), 200
+        
     except ValidationError as err:
         return {'errors': err.messages}, 400
     except Exception as e:
@@ -77,102 +157,50 @@ def update_service_ticket(ticket_id):
 
 @service_ticket_bp.route('/<int:ticket_id>', methods=['DELETE'])
 def delete_service_ticket(ticket_id):
-    """Delete a specific service ticket."""
+    """Delete a service ticket."""
     try:
         ticket = ServiceTicket.query.get(ticket_id)
         if not ticket:
             return {'error': 'Service ticket not found'}, 404
         
+        # Remove all mechanic assignments before deleting
+        ticket.mechanics.clear()
+        
         db.session.delete(ticket)
         db.session.commit()
+        
         return {'message': f'Service ticket {ticket_id} deleted successfully'}, 200
+        
     except Exception as e:
         db.session.rollback()
         return {'error': 'An error occurred while deleting the service ticket'}, 500
 
 
-@service_ticket_bp.route('/<int:ticket_id>/assign-mechanic/<int:mechanic_id>', methods=['PUT'])
-def assign_mechanic(ticket_id, mechanic_id):
-    """Assign a mechanic to a service ticket."""
-    try:
-        ticket = ServiceTicket.query.get(ticket_id)
-        mechanic = Mechanic.query.get(mechanic_id)
-        if not ticket or not mechanic:
-            return {'error': 'Service ticket or mechanic not found'}, 404
-        
-        if mechanic in ticket.mechanics:
-            return {'error': 'Mechanic already assigned'}, 409
-        
-        ticket.mechanics.append(mechanic)
-        # Auto-update status to 'In Progress' if 'Open'
-        if ticket.status == 'Open':
-            ticket.status = 'In Progress'
-        db.session.commit()
-        return {'message': f'Mechanic {mechanic_id} assigned to ticket {ticket_id}'}, 200
-    except Exception as e:
-        db.session.rollback()
-        return {'error': 'An error occurred while assigning the mechanic'}, 500
-
-
-@service_ticket_bp.route('/<int:ticket_id>/remove-mechanic/<int:mechanic_id>', methods=['PUT'])
-def remove_mechanic(ticket_id, mechanic_id):
-    """Remove a mechanic from a service ticket."""
-    try:
-        ticket = ServiceTicket.query.get(ticket_id)
-        mechanic = Mechanic.query.get(mechanic_id)
-        if not ticket or not mechanic:
-            return {'error': 'Service ticket or mechanic not found'}, 404
-        
-        if mechanic not in ticket.mechanics:
-            return {'error': 'Mechanic not assigned to this ticket'}, 409
-        
-        ticket.mechanics.remove(mechanic)
-        db.session.commit()
-        return {'message': f'Mechanic {mechanic_id} removed from ticket {ticket_id}'}, 200
-    except Exception as e:
-        db.session.rollback()
-        return {'error': 'An error occurred while removing the mechanic'}, 500
-
-
 @service_ticket_bp.route('/customer/<int:customer_id>', methods=['GET'])
-def get_tickets_by_customer(customer_id):
-    """Get all service tickets for a customer."""
+def get_customer_tickets(customer_id):
+    """Get all service tickets for a specific customer."""
     try:
         customer = Customer.query.get(customer_id)
         if not customer:
             return {'error': 'Customer not found'}, 404
-        return service_tickets_simple_schema.dump(customer.service_tickets), 200
+        
+        tickets = ServiceTicket.query.filter_by(customer_id=customer_id).all()
+        return service_tickets_schema.dump(tickets), 200
+        
     except Exception as e:
-        return {'error': 'An error occurred while retrieving tickets'}, 500
+        return {'error': 'An error occurred while retrieving customer tickets'}, 500
 
 
 @service_ticket_bp.route('/mechanic/<int:mechanic_id>', methods=['GET'])
-def get_tickets_by_mechanic(mechanic_id):
-    """Get all service tickets for a mechanic."""
+def get_mechanic_tickets(mechanic_id):
+    """Get all service tickets assigned to a specific mechanic."""
     try:
         mechanic = Mechanic.query.get(mechanic_id)
         if not mechanic:
             return {'error': 'Mechanic not found'}, 404
-        return service_tickets_simple_schema.dump(mechanic.service_tickets), 200
-    except Exception as e:
-        return {'error': 'An error occurred while retrieving tickets'}, 500
-
-
-@service_ticket_bp.route('/<int:ticket_id>/add-part/<int:inventory_id>', methods=['PUT'])
-def add_part_to_ticket(ticket_id, inventory_id):
-    """Add a single inventory part to a service ticket."""
-    try:
-        ticket = ServiceTicket.query.get(ticket_id)
-        inventory = Inventory.query.get(inventory_id)
-        if not ticket or not inventory:
-            return {'error': 'Service ticket or inventory item not found'}, 404
         
-        if inventory in ticket.inventories:
-            return {'error': 'Part already added to this ticket'}, 409
+        tickets = mechanic.service_tickets.all()
+        return service_tickets_schema.dump(tickets), 200
         
-        ticket.inventories.append(inventory)
-        db.session.commit()
-        return {'message': f'Part {inventory_id} added to ticket {ticket_id}'}, 200
     except Exception as e:
-        db.session.rollback()
-        return {'error': 'An error occurred while adding the part'}, 500
+        return {'error': 'An error occurred while retrieving mechanic tickets'}, 500
