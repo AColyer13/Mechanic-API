@@ -157,6 +157,27 @@ curl -X POST http://localhost:5000/customers/ \
   }'
 ```
 
+### Get All Customers
+```bash
+curl -X GET http://localhost:5000/customers/
+```
+
+### Update a Customer
+```bash
+curl -X PUT http://localhost:5000/customers/1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone": "555-5678",
+    "address": "456 Oak Ave"
+  }'
+```
+
+### Delete a Customer (Error if has tickets)
+```bash
+curl -X DELETE http://localhost:5000/customers/1
+# Returns details of blocking tickets if any
+```
+
 ### Create a Mechanic
 ```bash
 curl -X POST http://localhost:5000/mechanics/ \
@@ -170,6 +191,29 @@ curl -X POST http://localhost:5000/mechanics/ \
     "hourly_rate": 85.00,
     "hire_date": "2023-01-15"
   }'
+```
+
+### Assign Mechanic to Service Ticket
+```bash
+curl -X PUT http://localhost:5000/service-tickets/1/assign-mechanic/1
+# Automatically sets status to 'In Progress' if 'Open'
+```
+
+### Update Service Ticket Status
+```bash
+curl -X PUT http://localhost:5000/service-tickets/1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "Completed",
+    "actual_cost": 350.00
+  }'
+# Sets completed_at timestamp when status changes to 'Completed'
+```
+
+### Delete a Mechanic (Error if assigned)
+```bash
+curl -X DELETE http://localhost:5000/mechanics/1
+# Returns details of assigned tickets if any
 ```
 
 ### Create a Service Ticket
@@ -187,9 +231,9 @@ curl -X POST http://localhost:5000/service-tickets/ \
   }'
 ```
 
-### Assign Mechanic to Service Ticket
+### Get Tickets by Customer
 ```bash
-curl -X PUT http://localhost:5000/service-tickets/1/assign-mechanic/1
+curl -X GET http://localhost:5000/service-tickets/customer/1
 ```
 
 ## Database Models

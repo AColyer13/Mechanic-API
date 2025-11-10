@@ -92,7 +92,8 @@ def delete_customer(customer_id):
         
         # Check if customer has service tickets
         if customer.service_tickets:
-            return {'error': 'Cannot delete customer with active service tickets'}, 409
+            blocking_tickets = [{'id': t.id, 'description': t.description} for t in customer.service_tickets]
+            return {'error': 'Cannot delete customer with active service tickets', 'blocking_tickets': blocking_tickets}, 409
         
         db.session.delete(customer)
         db.session.commit()

@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "c92eb891-4a88-4c58-bd05-137399abedeb",
 		"name": "Mechanic Shop API - Complete Collection",
-		"description": "Complete API collection for the Mechanic Shop with all CRUD operations and mechanic assignment functionality",
+		"description": "Complete API collection for the Mechanic Shop with all CRUD operations and mechanic assignment functionality. Use variables like {{ticketId}} for dynamic testing.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -234,16 +234,15 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"customer_id\": 1,\n  \"vehicle_year\": 2020,\n  \"vehicle_make\": \"Toyota\",\n  \"vehicle_model\": \"Camry\",\n  \"vehicle_vin\": \"1234567890ABCDEFG\",\n  \"description\": \"Engine making strange noise when accelerating\",\n  \"estimated_cost\": 500.00,\n  \"status\": \"Open\"\n}"
+							"raw": "{\n  \"customer_id\": 1,\n  \"vehicle_year\": 2020,\n  \"vehicle_make\": \"Toyota\",\n  \"vehicle_model\": \"Camry\",\n  \"vehicle_vin\": \"1HGBH41JXMN109186\",\n  \"description\": \"Oil change and brake inspection\",\n  \"estimated_cost\": 150.00,\n  \"status\": \"Open\"\n}"
 						},
 						"url": {
-							"raw": "http://127.0.0.1:5000/service-tickets/",
+							"raw": "{{baseUrl}}/service-tickets/",
 							"protocol": "http",
-							"host": ["127", "0", "0", "1"],
-							"port": "5000",
+							"host": ["{{baseUrl}}"],
 							"path": ["service-tickets", ""]
 						},
-						"description": "Create a new service ticket. Required fields: customer_id, description"
+						"description": "Create a new service ticket. Required fields: customer_id, description. Status defaults to 'Open' if omitted."
 					}
 				},
 				{
@@ -291,13 +290,12 @@
 							"raw": "{\n  \"description\": \"Engine noise diagnosed - needs new belt\",\n  \"actual_cost\": 350.00,\n  \"status\": \"In Progress\"\n}"
 						},
 						"url": {
-							"raw": "http://127.0.0.1:5000/service-tickets/1",
+							"raw": "{{baseUrl}}/service-tickets/{{ticketId}}",
 							"protocol": "http",
-							"host": ["127", "0", "0", "1"],
-							"port": "5000",
-							"path": ["service-tickets", "1"]
+							"host": ["{{baseUrl}}"],
+							"path": ["service-tickets", "{{ticketId}}"]
 						},
-						"description": "Update a service ticket by ID (replace 1 with actual ticket ID)"
+						"description": "Update a service ticket by ID. Status must be one of: Open, In Progress, Completed, Cancelled."
 					}
 				},
 				{
@@ -321,13 +319,12 @@
 						"method": "PUT",
 						"header": [],
 						"url": {
-							"raw": "http://127.0.0.1:5000/service-tickets/1/assign-mechanic/1",
+							"raw": "{{baseUrl}}/service-tickets/{{ticketId}}/assign-mechanic/{{mechanicId}}",
 							"protocol": "http",
-							"host": ["127", "0", "0", "1"],
-							"port": "5000",
-							"path": ["service-tickets", "1", "assign-mechanic", "1"]
+							"host": ["{{baseUrl}}"],
+							"path": ["service-tickets", "{{ticketId}}", "assign-mechanic", "{{mechanicId}}"]
 						},
-						"description": "Assign a mechanic to a service ticket. Replace first 1 with ticket ID and second 1 with mechanic ID"
+						"description": "Assign a mechanic to a service ticket. Sets status to 'In Progress' if currently 'Open'."
 					}
 				},
 				{
@@ -383,6 +380,16 @@
 		{
 			"key": "baseUrl",
 			"value": "http://127.0.0.1:5000",
+			"type": "string"
+		},
+		{
+			"key": "ticketId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "mechanicId",
+			"value": "1",
 			"type": "string"
 		}
 	]
