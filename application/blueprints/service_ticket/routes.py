@@ -68,12 +68,18 @@ def update_service_ticket(ticket_id):
         if not ticket:
             return {'error': 'Service ticket not found'}, 404
         
-        # Handle status change to completed
-        if request.json.get('status') == 'Completed' and ticket.status != 'Completed':
-            request.json['completed_at'] = datetime.utcnow().isoformat()
+        # Get the current status before update
+        old_status = ticket.status
         
         # Validate and update ticket data
         ticket_data = service_ticket_schema.load(request.json, instance=ticket, partial=True)
+        
+        # Handle status change to completed
+        if hasattr(ticket_data, 'status') and ticket_data.status == 'Completed' and old_status != 'Completed':
+            ticket_data.completed_at = datetime.utcnow()
+        # Clear completed_at if status changes away from Completed
+        elif hasattr(ticket_data, 'status') and ticket_data.status != 'Completed' and old_status == 'Completed':
+            ticket_data.completed_at = None
         
         # Save changes
         db.session.commit()

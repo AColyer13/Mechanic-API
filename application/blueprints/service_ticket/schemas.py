@@ -1,7 +1,8 @@
 """Service ticket schemas for serialization and deserialization."""
 
 from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
-from marshmallow import fields, validate, ValidationError, pre_load
+from marshmallow import fields, validate, ValidationError, pre_load, post_load
+from datetime import datetime
 from application.models import ServiceTicket
 from application.extensions import db, ma
 
@@ -42,6 +43,15 @@ class ServiceTicketSchema(SQLAlchemyAutoSchema):
             for key, value in data.items():
                 if isinstance(value, str):
                     data[key] = value.strip()
+        return data
+    
+    @post_load
+    def set_completed_at(self, data, **kwargs):
+        """Set completed_at timestamp when status changes to Completed."""
+        if hasattr(data, 'status') and data.status == 'Completed':
+            # Only set completed_at if it's not already set
+            if not hasattr(data, 'completed_at') or data.completed_at is None:
+                data.completed_at = datetime.utcnow()
         return data
 
 
