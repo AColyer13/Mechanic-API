@@ -4,8 +4,9 @@ from flask import request, jsonify
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError
 from application.extensions import db
-from application.models import Customer
-from .customerSchemas import customer_schema, customers_schema, customer_simple_schema, customers_simple_schema
+from application.models import Customer, ServiceTicket
+from application.auth import encode_token, token_required, hash_password, check_password
+from .customerSchemas import customer_schema, customers_schema, customer_simple_schema, customers_simple_schema, login_schema
 from . import customer_bp
 
 
@@ -16,11 +17,15 @@ def create_customer():
         # Validate and deserialize input
         customer_data = customer_schema.load(request.json)
         
+        # Hash the password
+        if 'password' in request.json:
+            customer_data.password_hash = hash_password(request.json['password'])
+        
         # Save to database
         db.session.add(customer_data)
         db.session.commit()
         
-        # Return serialized customer
+        # Return serialized customer (exclude password)
         return customer_simple_schema.dump(customer_data), 201
         
     except ValidationError as err:
@@ -31,6 +36,41 @@ def create_customer():
     except Exception as e:
         db.session.rollback()
         return {'error': 'An error occurred while creating the customer'}, 500
+
+
+@customer_bp.route('/login', methods=['POST'])
+def login():
+    """Login a customer and return a token."""
+    try:
+        # Validate input
+        login_data = login_schema.load(request.json)
+        
+        # Find customer by email
+        customer = Customer.query.filter_by(email=login_data.email).first()
+        if not customer or not check_password(customer.password_hash, login_data.password):
+            return {'error': 'Invalid email or password'}, 401
+        
+        # Generate token
+        token = encode_token(customer.id)
+        return {'token': token, 'customer_id': customer.id}, 200
+        
+    except ValidationError as err:
+        return {'errors': err.messages}, 400
+    except Exception as e:
+        return {'error': 'An error occurred during login'}, 500
+
+
+@customer_bp.route('/my-tickets', methods=['GET'])
+@token_required
+def get_my_tickets(customer_id):
+    """Get service tickets for the authenticated customer."""
+    try:
+        tickets = ServiceTicket.query.filter_by(customer_id=customer_id).all()
+        # Use simple schema to avoid circular references
+        from application.blueprints.service_ticket.schemas import service_tickets_simple_schema
+        return service_tickets_simple_schema.dump(tickets), 200
+    except Exception as e:
+        return {'error': 'An error occurred while retrieving tickets'}, 500
 
 
 @customer_bp.route('/', methods=['GET'])
@@ -57,20 +97,28 @@ def get_customer(customer_id):
 
 
 @customer_bp.route('/<int:customer_id>', methods=['PUT'])
-def update_customer(customer_id):
+@token_required
+def update_customer(customer_id_from_token, customer_id):
     """Update a specific customer."""
+    if customer_id_from_token != customer_id:
+        return {'error': 'Unauthorized'}, 403
+    
     try:
         customer = Customer.query.get(customer_id)
         if not customer:
             return {'error': 'Customer not found'}, 404
         
         # Validate and update customer data
-        customer_data = customer_schema.load(request.json, instance=customer, partial=True)
+        update_data = customer_schema.load(request.json, instance=customer, partial=True)
+        
+        # Hash password if provided
+        if 'password' in request.json:
+            update_data.password_hash = hash_password(request.json['password'])
         
         # Save changes
         db.session.commit()
         
-        return customer_simple_schema.dump(customer_data), 200
+        return customer_simple_schema.dump(update_data), 200
         
     except ValidationError as err:
         return {'errors': err.messages}, 400
@@ -83,8 +131,12 @@ def update_customer(customer_id):
 
 
 @customer_bp.route('/<int:customer_id>', methods=['DELETE'])
-def delete_customer(customer_id):
+@token_required
+def delete_customer(customer_id_from_token, customer_id):
     """Delete a specific customer."""
+    if customer_id_from_token != customer_id:
+        return {'error': 'Unauthorized'}, 403
+    
     try:
         customer = Customer.query.get(customer_id)
         if not customer:

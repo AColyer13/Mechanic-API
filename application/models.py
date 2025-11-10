@@ -17,6 +17,7 @@ class Customer(db.Model):
     email = db.Column(db.String(100), unique=True, nullable=False)
     phone = db.Column(db.String(20), nullable=True)
     address = db.Column(db.String(200), nullable=True)
+    password_hash = db.Column(db.String(128), nullable=False)  # Hashed password
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationship to service tickets

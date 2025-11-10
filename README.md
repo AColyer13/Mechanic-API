@@ -4,10 +4,11 @@ A RESTful API for managing a mechanic shop built with Flask using the Applicatio
 
 ## Features
 
-- **Customer Management**: Full CRUD operations for customers
+- **Customer Management**: Full CRUD operations for customers with authentication
 - **Mechanic Management**: Full CRUD operations for mechanics
 - **Service Ticket Management**: Create, read, update, and delete service tickets
 - **Mechanic Assignment**: Assign and remove mechanics from service tickets
+- **Authentication**: JWT-based login for customers with protected routes
 - **Database Relationships**: Many-to-many relationships between mechanics and service tickets
 - **Input Validation**: Comprehensive validation using Marshmallow schemas
 - **Error Handling**: Proper error responses and status codes
@@ -144,7 +145,7 @@ The API will be available at `http://localhost:5000`
 
 ## Sample API Usage
 
-### Create a Customer
+### Create a Customer (with password)
 ```bash
 curl -X POST http://localhost:5000/customers/ \
   -H "Content-Type: application/json" \
@@ -153,22 +154,35 @@ curl -X POST http://localhost:5000/customers/ \
     "last_name": "Doe",
     "email": "john.doe@email.com",
     "phone": "555-1234",
-    "address": "123 Main St"
+    "address": "123 Main St",
+    "password": "securepassword"
   }'
 ```
 
-### Get All Customers
+### Login a Customer
 ```bash
-curl -X GET http://localhost:5000/customers/
-```
-
-### Update a Customer
-```bash
-curl -X PUT http://localhost:5000/customers/1 \
+curl -X POST http://localhost:5000/customers/login \
   -H "Content-Type: application/json" \
   -d '{
-    "phone": "555-5678",
-    "address": "456 Oak Ave"
+    "email": "john.doe@email.com",
+    "password": "securepassword"
+  }'
+# Returns a token for authenticated requests
+```
+
+### Get My Service Tickets (Authenticated)
+```bash
+curl -X GET http://localhost:5000/customers/my-tickets \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+### Update a Customer (Authenticated)
+```bash
+curl -X PUT http://localhost:5000/customers/1 \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone": "555-5678"
   }'
 ```
 
