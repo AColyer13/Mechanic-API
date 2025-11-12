@@ -2,7 +2,7 @@
 
 from flask import Flask
 from config import config
-from .extensions import db, ma, migrate
+from .extensions import db, ma, migrate, limiter, cache
 
 
 def create_app(config_name='development'):
@@ -18,6 +18,8 @@ def create_app(config_name='development'):
     db.init_app(app)
     ma.init_app(app)
     migrate.init_app(app, db)
+    limiter.init_app(app)  # Initialize Flask-Limiter
+    cache.init_app(app)    # Initialize Flask-Caching
     
     # Import models to ensure they're registered with SQLAlchemy
     from . import models
