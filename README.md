@@ -1,48 +1,79 @@
 # Mechanic Shop API
 
-A RESTful API for managing a mechanic shop built with Flask using the Application Factory Pattern. This API allows you to manage customers, mechanics, and service tickets with full CRUD operations, mechanic assignment capabilities, rate limiting, and caching.
+A comprehensive RESTful API for managing a mechanic shop built with Flask using the Application Factory Pattern. This API provides full CRUD operations for customers, mechanics, service tickets, and inventory parts, along with advanced features like JWT authentication, rate limiting, and caching.
 
 ## Features
 
-- **Customer Management**: Full CRUD operations for customers
-- **Mechanic Management**: Full CRUD operations for mechanics
-- **Service Ticket Management**: Create, read, update, and delete service tickets
-- **Mechanic Assignment**: Assign and remove mechanics from service tickets
-- **Database Relationships**: Many-to-many relationships between mechanics and service tickets
+### Core Functionality
+- **Customer Management**: Full CRUD operations with secure password hashing (bcrypt)
+- **Mechanic Management**: Complete mechanic lifecycle management
+- **Service Ticket Management**: Track repairs with customer and mechanic assignments
+- **Inventory Management**: Manage parts with pricing and usage tracking
+- **Many-to-Many Relationships**: 
+  - Mechanics ↔ Service Tickets
+  - Inventory Parts ↔ Service Tickets
+
+### Security & Authentication
+- **JWT Token Authentication**: Secure customer authentication using python-jose
+- **Password Hashing**: Bcrypt encryption for customer passwords
+- **Token-Protected Routes**: Secured endpoints requiring Bearer token authorization
+- **Customer-Specific Access**: Users can only access/modify their own data
+
+### Performance & Protection
+- **Rate Limiting**: Flask-Limiter protection against API abuse
+- **Caching**: Flask-Caching for optimized database performance
 - **Input Validation**: Comprehensive validation using Marshmallow schemas
 - **Error Handling**: Proper error responses and status codes
-- **Rate Limiting**: Protection against API abuse with configurable limits (Flask-Limiter)
-- **Caching**: Performance optimization with in-memory caching (Flask-Caching)
-- **Database Migrations**: Schema versioning with Flask-Migrate
-- **MySQL Database**: Persistent data storage with MySQL
-- **Interactive Client**: Command-line client for easy API testing
 
 ## Technical Stack
 
 - **Framework**: Flask 3.0.0
 - **Database**: MySQL with SQLAlchemy ORM
-- **Serialization**: Marshmallow for data validation and serialization
-- **Rate Limiting**: Flask-Limiter (10 requests/minute on create endpoints)
-- **Caching**: Flask-Caching (5-minute cache on GET all endpoints)
-- **Database Migrations**: Flask-Migrate
-- **API Testing**: Custom Python client with requests library
+- **Authentication**: JWT tokens (python-jose)
+- **Password Security**: bcrypt (via passlib)
+- **Serialization**: Marshmallow & marshmallow-sqlalchemy
+- **Rate Limiting**: Flask-Limiter (configurable per endpoint)
+- **Caching**: Flask-Caching (in-memory with 5-minute TTL)
+- **Database Migrations**: Flask-Migrate with Alembic
+- **API Testing**: Postman collection with 40+ requests
 
-## Rate Limiting & Caching
+## Advanced Features
+
+### JWT Token Authentication
+Secure authentication system for customer accounts:
+
+**Login Flow:**
+1. Customer registers: `POST /customers/` with email and password
+2. Customer logs in: `POST /customers/login` → receives JWT token
+3. Protected routes require: `Authorization: Bearer <token>` header
+
+**Protected Endpoints:**
+- `GET /customers/my-tickets` - Get authenticated customer's tickets
+- `PUT /customers/{id}` - Update own account only
+- `DELETE /customers/{id}` - Delete own account only
+
+**Token Features:**
+- 24-hour expiration
+- HS256 algorithm
+- Customer ID embedded in payload
+- Automatic validation via `@token_required` decorator
 
 ### Rate Limiting
-The API implements rate limiting on critical endpoints to prevent abuse:
-- **POST /customers/**: Limited to 10 requests per minute
-- **POST /mechanics/**: Limited to 10 requests per minute
-- **Global Default**: 200 requests per day, 50 requests per hour for all other routes
+Protection against API abuse with configurable limits:
+- **POST /customers/**: 10 requests/minute
+- **POST /mechanics/**: 10 requests/minute
+- **POST /inventory/**: 20 requests/minute
+- **Global Default**: 200 requests/day, 50 requests/hour
 
-When rate limit is exceeded, you'll receive a `429 Too Many Requests` response.
+Exceeding limits returns `429 Too Many Requests` with retry-after header.
 
 ### Caching
-Performance-critical endpoints are cached to reduce database load:
-- **GET /customers/**: Results cached for 5 minutes
-- **GET /mechanics/**: Results cached for 5 minutes
+Performance optimization with automatic invalidation:
+- **GET /customers/**: 5-minute cache
+- **GET /mechanics/**: 5-minute cache
+- **GET /inventory/**: 5-minute cache
 
-Cache is automatically invalidated when new records are created to ensure data freshness.
+Cache auto-clears on create/update/delete operations for data consistency.
 
 ## Setup Instructions
 
@@ -125,26 +156,33 @@ If you can't activate the virtual environment due to execution policy, use the P
 ```
 /project
 ├── /application
-│   ├── __init__.py                 # Application factory with create_app()
-│   ├── extensions.py              # Flask extensions initialization
-│   ├── models.py                  # Database models
+│   ├── __init__.py                      # Application factory with create_app()
+│   ├── extensions.py                   # Extensions: db, cache, limiter, JWT functions
+│   ├── models.py                       # Models: Customer, Mechanic, ServiceTicket, Inventory
 │   └── /blueprints
 │       ├── /customer
-│       │   ├── __init__.py        # Customer blueprint initialization
-│       │   ├── routes.py          # Customer CRUD routes
-│       │   └── customerSchemas.py # Customer Marshmallow schemas
+│       │   ├── __init__.py             # Customer blueprint
+│       │   ├── routes.py               # CRUD + login + token-protected routes
+│       │   └── customerSchemas.py      # Customer & Login schemas
 │       ├── /mechanic
-│       │   ├── __init__.py        # Mechanic blueprint initialization
-│       │   ├── routes.py          # Mechanic CRUD routes
-│       │   └── schemas.py         # Mechanic Marshmallow schemas
-│       └── /service_ticket
-│           ├── __init__.py        # Service ticket blueprint initialization
-│           ├── routes.py          # Service ticket routes
-│           └── schemas.py         # Service ticket Marshmallow schemas
-├── app.py                         # Main application entry point
-├── config.py                      # Configuration settings
-├── requirements.txt               # Python dependencies
-└── .env.example                   # Environment variables template
+│       │   ├── __init__.py             # Mechanic blueprint
+│       │   ├── routes.py               # CRUD operations
+│       │   └── schemas.py              # Mechanic schemas
+│       ├── /service_ticket
+│       │   ├── __init__.py             # Service ticket blueprint
+│       │   ├── routes.py               # CRUD + mechanic assignment + add parts
+│       │   └── schemas.py              # Service ticket schemas
+│       └── /inventory
+│           ├── __init__.py             # Inventory blueprint
+│           ├── routes.py               # CRUD operations
+│           └── schemas.py              # Inventory schemas
+├── app.py                              # Application entry point
+├── config.py                           # Configuration settings
+├── requirements.txt                    # Python dependencies
+├── client.py                           # Interactive CLI client
+├── test_api.py                         # Automated test script
+├── Mechanic API.postman_collection.json # Postman collection (40+ requests)
+└── TESTING_GUIDE.md                    # Comprehensive testing documentation
 ```
 
 ## Setup Instructions
@@ -179,37 +217,48 @@ The API will be available at `http://localhost:5000`
 
 ## API Endpoints
 
-### Customers (`/customers`)
+### Authentication (`/customers`)
+- `POST /customers/login` - Login and receive JWT token
+- `GET /customers/my-tickets` - Get authenticated customer's tickets (requires token)
 
-- `POST /customers/` - Create a new customer
-- `GET /customers/` - Get all customers
-- `GET /customers/<id>` - Get a specific customer
-- `PUT /customers/<id>` - Update a customer
-- `DELETE /customers/<id>` - Delete a customer
+### Customers (`/customers`)
+- `POST /customers/` - Create new customer (includes password hashing) [Rate Limited: 10/min]
+- `GET /customers/` - Get all customers [Cached: 5 min]
+- `GET /customers/<id>` - Get specific customer
+- `PUT /customers/<id>` - Update customer (requires token, own account only)
+- `DELETE /customers/<id>` - Delete customer (requires token, own account only)
 
 ### Mechanics (`/mechanics`)
-
-- `POST /mechanics/` - Create a new mechanic
-- `GET /mechanics/` - Get all mechanics
-- `GET /mechanics/<id>` - Get a specific mechanic
-- `PUT /mechanics/<id>` - Update a mechanic
-- `DELETE /mechanics/<id>` - Delete a mechanic
+- `POST /mechanics/` - Create new mechanic [Rate Limited: 10/min]
+- `GET /mechanics/` - Get all mechanics [Cached: 5 min]
+- `GET /mechanics/<id>` - Get specific mechanic
+- `PUT /mechanics/<id>` - Update mechanic
+- `DELETE /mechanics/<id>` - Delete mechanic
 
 ### Service Tickets (`/service-tickets`)
-
-- `POST /service-tickets/` - Create a new service ticket
+- `POST /service-tickets/` - Create new service ticket
 - `GET /service-tickets/` - Get all service tickets
-- `GET /service-tickets/<id>` - Get a specific service ticket
-- `PUT /service-tickets/<id>` - Update a service ticket
-- `DELETE /service-tickets/<id>` - Delete a service ticket
-- `PUT /service-tickets/<ticket_id>/assign-mechanic/<mechanic_id>` - Assign mechanic to ticket
-- `PUT /service-tickets/<ticket_id>/remove-mechanic/<mechanic_id>` - Remove mechanic from ticket
-- `GET /service-tickets/customer/<customer_id>` - Get all tickets for a customer
-- `GET /service-tickets/mechanic/<mechanic_id>` - Get all tickets for a mechanic
+- `GET /service-tickets/<id>` - Get specific service ticket
+- `PUT /service-tickets/<id>` - Update service ticket
+- `DELETE /service-tickets/<id>` - Delete service ticket
+- `PUT /service-tickets/<ticket_id>/assign-mechanic/<mechanic_id>` - Assign mechanic
+- `PUT /service-tickets/<ticket_id>/remove-mechanic/<mechanic_id>` - Remove mechanic
+- `PUT /service-tickets/<ticket_id>/add-part/<inventory_id>` - Add inventory part
+- `GET /service-tickets/customer/<customer_id>` - Get customer's tickets
+- `GET /service-tickets/mechanic/<mechanic_id>` - Get mechanic's tickets
+
+### Inventory (`/inventory`)
+- `POST /inventory/` - Create new inventory part [Rate Limited: 20/min]
+- `GET /inventory/` - Get all inventory parts [Cached: 5 min]
+- `GET /inventory/<id>` - Get specific inventory part
+- `PUT /inventory/<id>` - Update inventory part
+- `DELETE /inventory/<id>` - Delete inventory part
 
 ## Sample API Usage
 
-### Create a Customer
+### Authentication Flow
+
+#### 1. Create a Customer (with password)
 ```bash
 curl -X POST http://localhost:5000/customers/ \
   -H "Content-Type: application/json" \
@@ -217,9 +266,35 @@ curl -X POST http://localhost:5000/customers/ \
     "first_name": "John",
     "last_name": "Doe",
     "email": "john.doe@email.com",
+    "password": "securepassword123",
     "phone": "555-1234",
     "address": "123 Main St"
   }'
+```
+
+#### 2. Login and Get JWT Token
+```bash
+curl -X POST http://localhost:5000/customers/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john.doe@email.com",
+    "password": "securepassword123"
+  }'
+```
+
+Response:
+```json
+{
+  "message": "Login successful",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "customer": { ... }
+}
+```
+
+#### 3. Access Protected Route
+```bash
+curl -X GET http://localhost:5000/customers/my-tickets \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 ### Create a Mechanic
@@ -257,6 +332,21 @@ curl -X POST http://localhost:5000/service-tickets/ \
 curl -X PUT http://localhost:5000/service-tickets/1/assign-mechanic/1
 ```
 
+### Create Inventory Part
+```bash
+curl -X POST http://localhost:5000/inventory/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Oil Filter",
+    "price": 12.99
+  }'
+```
+
+### Add Part to Service Ticket
+```bash
+curl -X PUT http://localhost:5000/service-tickets/1/add-part/1
+```
+
 ## Database Models
 
 ### Customer
@@ -264,9 +354,11 @@ curl -X PUT http://localhost:5000/service-tickets/1/assign-mechanic/1
 - `first_name`: Customer's first name (required)
 - `last_name`: Customer's last name (required)
 - `email`: Customer's email (required, unique)
+- `password`: Hashed password (required, bcrypt)
 - `phone`: Customer's phone number
 - `address`: Customer's address
 - `created_at`: Timestamp of creation
+- **Relationship**: One-to-Many with ServiceTicket
 
 ### Mechanic
 - `id`: Primary key
@@ -278,6 +370,7 @@ curl -X PUT http://localhost:5000/service-tickets/1/assign-mechanic/1
 - `hourly_rate`: Mechanic's hourly billing rate
 - `hire_date`: Date mechanic was hired
 - `created_at`: Timestamp of creation
+- **Relationship**: Many-to-Many with ServiceTicket
 
 ### ServiceTicket
 - `id`: Primary key
@@ -292,40 +385,84 @@ curl -X PUT http://localhost:5000/service-tickets/1/assign-mechanic/1
 - `status`: Ticket status (Open, In Progress, Completed, Cancelled)
 - `created_at`: Timestamp of creation
 - `completed_at`: Timestamp when completed
+- **Relationships**: 
+  - Many-to-One with Customer
+  - Many-to-Many with Mechanic
+  - Many-to-Many with Inventory
+
+### Inventory
+- `id`: Primary key
+- `name`: Part name (required, max 100 chars)
+- `price`: Part price (required, must be >= 0)
+- **Relationship**: Many-to-Many with ServiceTicket
 
 ## Testing with Postman
 
-Import the following collection structure in Postman:
+### Importing the Collection
+1. Open Postman
+2. Click **Import** → Select `Mechanic API.postman_collection.json`
+3. Collection includes 40+ organized requests
 
-1. **Customers Collection**
-   - Create Customer
-   - Get All Customers
-   - Get Customer by ID
-   - Update Customer
-   - Delete Customer
+### Collection Structure
 
-2. **Mechanics Collection**
-   - Create Mechanic
-   - Get All Mechanics
-   - Get Mechanic by ID
-   - Update Mechanic
-   - Delete Mechanic
+**1. API Root**
+- Get API welcome message
 
-3. **Service Tickets Collection**
-   - Create Service Ticket
-   - Get All Service Tickets
-   - Get Service Ticket by ID
-   - Update Service Ticket
-   - Delete Service Ticket
-   - Assign Mechanic to Ticket
-   - Remove Mechanic from Ticket
-   - Get Customer Tickets
-   - Get Mechanic Tickets
+**2. Customers** (Full CRUD)
+- Create, Read, Update, Delete operations
+
+**3. Mechanics** (Full CRUD)
+- Create, Read, Update, Delete operations
+
+**4. Service Tickets** (Full CRUD + Assignment)
+- CRUD operations
+- Assign/Remove Mechanic
+- Add Part to Ticket
+- Query by Customer/Mechanic
+
+**5. Authentication** ⭐
+- Customer Login (auto-saves token to environment)
+- Get My Tickets (requires token)
+- Update Customer (requires token)
+- Delete Customer (requires token)
+
+**6. Inventory** (Full CRUD)
+- Create, Read, Update, Delete operations
+- Rate limiting and caching enabled
+
+### Testing Features
+- **Auto Token Management**: Login request saves JWT to `{{auth_token}}`
+- **Sample Data**: Pre-filled request bodies
+- **Documentation**: Each request includes description
+- **Variables**: Use `{{baseUrl}}` for easy configuration
+
+See `TESTING_GUIDE.md` for detailed testing instructions.
 
 ## Development Notes
 
-- The API uses SQLAlchemy for database operations
-- Marshmallow provides serialization and validation
-- Flask-Migrate can be used for database migrations
-- The application follows the Application Factory pattern for better testability and modularity
-- Each blueprint is self-contained with its own routes and schemas
+### Architecture
+- **Application Factory Pattern**: Enables testing and multiple configurations
+- **Blueprint Organization**: Self-contained modules with routes and schemas
+- **SQLAlchemy ORM**: Database abstraction and relationship management
+- **Marshmallow**: Data serialization, deserialization, and validation
+
+### Security Implementations
+- **Password Hashing**: bcrypt with automatic salt generation
+- **JWT Tokens**: 24-hour expiration, HS256 signing
+- **Token Validation**: Middleware decorator for protected routes
+- **Authorization**: Customer-specific access control
+
+### Performance Optimizations
+- **Query Optimization**: Lazy loading for relationships
+- **Caching Strategy**: 5-minute TTL with automatic invalidation
+- **Rate Limiting**: Prevents abuse and ensures fair usage
+- **Connection Pooling**: SQLAlchemy handles database connections
+
+### Testing
+- **Postman Collection**: 40+ pre-configured requests
+- **Automated Tests**: `test_api.py` for full API validation
+- **Interactive Client**: `client.py` for manual testing
+- **Comprehensive Guide**: `TESTING_GUIDE.md` with detailed instructions
+
+## License
+This project is for educational purposes.
