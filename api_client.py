@@ -1221,16 +1221,25 @@ def main():
     # Initialize client
     client = MechanicAPIClient()
     
-    # Test connection
+    # Test connection with a simple endpoint first
     try:
-        response = client._make_request('GET', '/customers/', params={'page': 1, 'per_page': 1})
+        # Try a simple inventory endpoint first (usually works even with empty DB)
+        response = client._make_request('GET', '/inventory/')
         if response.status_code in [200, 404]:
             print("✅ Connected to API server successfully!")
+        elif response.status_code == 500:
+            print("⚠️  API server connected but returned internal error")
+            print("This might be due to database issues - trying to continue...")
         else:
             print(f"⚠️  API server responded with status {response.status_code}")
-    except:
+            print("Trying to continue anyway...")
+    except requests.exceptions.ConnectionError:
         print("❌ Could not connect to API server!")
+        print("Make sure the Flask application is running on http://127.0.0.1:5000")
         return
+    except Exception as e:
+        print(f"⚠️  Connection test failed: {e}")
+        print("Trying to continue anyway...")
     
     # Main menu loop
     while True:
