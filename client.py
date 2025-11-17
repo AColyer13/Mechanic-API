@@ -11,9 +11,51 @@ import requests
 import json
 from datetime import datetime
 import sys
+import time
+import msvcrt  # For Windows keyboard input
 
 BASE_URL = "http://127.0.0.1:5000"
 HEADERS = {"Content-Type": "application/json"}
+
+def safe_input(prompt, wait_for_input=True):
+    """Input function that works with VS Code Run button"""
+    print(prompt, end='', flush=True)
+    
+    # Give terminal time to initialize on first call
+    if wait_for_input:
+        time.sleep(0.2)
+    
+    # Try standard input first
+    try:
+        return input()
+    except (EOFError, KeyboardInterrupt):
+        # If that fails, try msvcrt (Windows console direct access)
+        try:
+            result = []
+            print()  # New line after prompt
+            print("(Type your choice and press Enter)", flush=True)
+            while True:
+                if msvcrt.kbhit():
+                    char = msvcrt.getwche()
+                    if char == '\r':  # Enter key
+                        print()
+                        return ''.join(result)
+                    elif char == '\x03':  # Ctrl+C
+                        return None
+                    elif char == '\b':  # Backspace
+                        if result:
+                            result.pop()
+                            print('\b \b', end='', flush=True)
+                    else:
+                        result.append(char)
+                time.sleep(0.01)
+        except:
+            # Last resort: return None if all else fails
+            print("\n⚠️  Unable to read input. Please run manually: python client.py")
+            time.sleep(2)
+            return None
+            print("\n⚠️  Unable to read input. Please run: python client.py")
+            return None
 
 class MechanicShopAPIClient:
     def __init__(self):
@@ -799,16 +841,30 @@ def main():
         print("   • Missing dependencies - run: .venv\\Scripts\\python.exe -m pip install -r requirements.txt")
         print("="*70)
         
-        choice = input("\n🤔 Continue with client anyway? (y/N): ").strip().lower()
+        choice = safe_input("\n🤔 Continue with client anyway? (y/N): ")
+        if choice is None:
+            print("\n👋 Exiting...")
+            return
+        choice = choice.strip().lower()
+            
         if choice != 'y':
             print("👋 Exiting... Start Flask API first, then run client again.")
             return
     else:
         print(f"\n🎉 Ready to use API at: {working_url}")
 
+    # Delay and flush to ensure stdin is ready (Windows terminal issue)
+    time.sleep(0.5)
+    
     while True:
         display_main_menu(client)
-        choice = input("Enter your choice (0-23): ").strip()
+        sys.stdout.flush()  # Ensure all output is displayed
+        
+        choice = safe_input("Enter your choice (0-23): ")
+        if choice is None:
+            print("\n👋 Goodbye!")
+            break
+        choice = choice.strip()
         
         try:
             if choice == '0':

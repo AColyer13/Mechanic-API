@@ -8,7 +8,8 @@ config_name = os.environ.get('FLASK_ENV', 'development')
 app = create_app(config_name)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Disable debug mode to avoid Python 3.14 debugger import issues on Windows
+    app.run(debug=False)
 
 
 
