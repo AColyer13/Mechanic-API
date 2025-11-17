@@ -20,19 +20,27 @@ class MechanicShopAPIClient:
         self.base_url = BASE_URL
         self.headers = HEADERS
         self.session = requests.Session()
+        self.token = None
+        self.logged_in_customer_id = None
         
-    def make_request(self, method, endpoint, data=None, params=None):
+    def make_request(self, method, endpoint, data=None, params=None, use_token=False):
         """Make HTTP request to API and handle response"""
         url = f"{self.base_url}{endpoint}"
+        headers = self.headers.copy()
+        
+        # Add Authorization header if token is available and requested
+        if use_token and self.token:
+            headers['Authorization'] = f'Bearer {self.token}'
+        
         try:
             if method.upper() == 'GET':
-                response = self.session.get(url, params=params)
+                response = self.session.get(url, params=params, headers=headers)
             elif method.upper() == 'POST':
-                response = self.session.post(url, json=data, headers=self.headers)
+                response = self.session.post(url, json=data, headers=headers)
             elif method.upper() == 'PUT':
-                response = self.session.put(url, json=data, headers=self.headers)
+                response = self.session.put(url, json=data, headers=headers)
             elif method.upper() == 'DELETE':
-                response = self.session.delete(url)
+                response = self.session.delete(url, headers=headers)
             else:
                 print(f"Error: Unsupported method: {method}")
                 return None
@@ -62,6 +70,58 @@ class MechanicShopAPIClient:
             print(f"Response: {response.text}")
             return response.text
 
+    # AUTHENTICATION
+    
+    def login(self):
+        """POST /customers/login - Login and get JWT token"""
+        print("\n🔐 Customer Login")
+        print("-" * 40)
+        
+        email = input("Enter email: ").strip()
+        if not email:
+            print("❌ Email required")
+            return None
+        
+        password = input("Enter password: ").strip()
+        if not password:
+            print("❌ Password required")
+            return None
+        
+        data = {
+            "email": email,
+            "password": password
+        }
+        
+        response = self.make_request('POST', '/customers/login', data)
+        if response and 'token' in response:
+            self.token = response['token']
+            self.logged_in_customer_id = response.get('customer_id')
+            print(f"\n✅ Login successful!")
+            print(f"👤 Logged in as Customer ID: {self.logged_in_customer_id}")
+            print(f"🔑 Token: {self.token[:20]}...")
+        return response
+    
+    def logout(self):
+        """Logout and clear token"""
+        if self.token:
+            print("\n👋 Logging out...")
+            self.token = None
+            self.logged_in_customer_id = None
+            print("✅ Logged out successfully")
+        else:
+            print("\nℹ️ Not currently logged in")
+    
+    def get_my_tickets(self):
+        """GET /customers/my-tickets - Get tickets for logged-in customer (requires token)"""
+        print("\n🎫 Getting My Service Tickets")
+        print("-" * 40)
+        
+        if not self.token:
+            print("❌ Please login first (option 21)")
+            return None
+        
+        return self.make_request('GET', '/customers/my-tickets', use_token=True)
+    
     # CUSTOMER ENDPOINTS
     
     def create_customer(self):
@@ -87,13 +147,20 @@ class MechanicShopAPIClient:
                 break
             print("❌ Valid email required!")
         
+        while True:
+            password = input("Enter password (required): ").strip()
+            if password and len(password) >= 6:
+                break
+            print("❌ Password must be at least 6 characters!")
+        
         phone = input("Enter phone (optional): ").strip()
         address = input("Enter address (optional): ").strip()
         
         data = {
             "first_name": first_name,
             "last_name": last_name,
-            "email": email
+            "email": email,
+            "password": password
         }
         
         if phone:
@@ -121,10 +188,19 @@ class MechanicShopAPIClient:
         return self.make_request('GET', f'/customers/{customer_id}')
     
     def update_customer(self):
-        """PUT /customers/<id> - Update customer"""
+        """PUT /customers/<id> - Update customer (requires token)"""
         print("\n✏️ Updating Customer")
         print("-" * 40)
-        customer_id = input("Enter Customer ID to update: ").strip()
+        
+        if not self.token:
+            print("❌ Please login first (option 21)")
+            return None
+        
+        # Default to logged-in customer's ID
+        default_id = str(self.logged_in_customer_id) if self.logged_in_customer_id else ""
+        customer_id = input(f"Enter Customer ID to update [{default_id}]: ").strip()
+        if not customer_id and default_id:
+            customer_id = default_id
         if not customer_id.isdigit():
             print("❌ Invalid Customer ID")
             return None
@@ -151,20 +227,32 @@ class MechanicShopAPIClient:
             print("❌ No changes specified")
             return None
             
-        return self.make_request('PUT', f'/customers/{customer_id}', data)
+        return self.make_request('PUT', f'/customers/{customer_id}', data, use_token=True)
     
     def delete_customer(self):
-        """DELETE /customers/<id> - Delete customer"""
+        """DELETE /customers/<id> - Delete customer (requires token)"""
         print("\n🗑️ Deleting Customer")
         print("-" * 40)
-        customer_id = input("Enter Customer ID to delete: ").strip()
+        
+        if not self.token:
+            print("❌ Please login first (option 21)")
+            return None
+        
+        # Default to logged-in customer's ID
+        default_id = str(self.logged_in_customer_id) if self.logged_in_customer_id else ""
+        customer_id = input(f"Enter Customer ID to delete [{default_id}]: ").strip()
+        if not customer_id and default_id:
+            customer_id = default_id
         if not customer_id.isdigit():
             print("❌ Invalid Customer ID")
             return None
             
         confirm = input(f"⚠️ Are you sure you want to delete customer {customer_id}? (y/N): ").strip().lower()
         if confirm == 'y':
-            return self.make_request('DELETE', f'/customers/{customer_id}')
+            result = self.make_request('DELETE', f'/customers/{customer_id}', use_token=True)
+            if result and 'message' in result:
+                self.logout()  # Auto-logout after deleting own account
+            return result
         else:
             print("🚫 Deletion cancelled")
             return None
@@ -594,17 +682,29 @@ class MechanicShopAPIClient:
         print(f"Created {len(customer_ids)} customers, {len(mechanic_ids)} mechanics, {len(ticket_ids)} service tickets")
 
 
-def display_main_menu():
+def display_main_menu(client):
     """Display the main menu"""
     print("\n" + "=" * 60)
     print("🔧 MECHANIC SHOP API CLIENT 🔧")
     print("=" * 60)
-    print("CUSTOMER OPERATIONS:")
-    print("  1.  Create Customer")
+    
+    # Show login status
+    if client.token:
+        print(f"🔐 Logged in as Customer ID: {client.logged_in_customer_id}")
+    else:
+        print("🔓 Not logged in")
+    print("=" * 60)
+    
+    print("AUTHENTICATION:")
+    print("  21. Login (Get JWT Token)")
+    print("  22. Logout")
+    print("  23. Get My Tickets (requires login)")
+    print("\nCUSTOMER OPERATIONS:")
+    print("  1.  Create Customer (with password)")
     print("  2.  Get All Customers") 
     print("  3.  Get Customer by ID")
-    print("  4.  Update Customer")
-    print("  5.  Delete Customer")
+    print("  4.  Update Customer (requires login)")
+    print("  5.  Delete Customer (requires login)")
     print("\nMECHANIC OPERATIONS:")
     print("  6.  Create Mechanic")
     print("  7.  Get All Mechanics")
@@ -704,8 +804,8 @@ def main():
         print(f"\n🎉 Ready to use API at: {working_url}")
 
     while True:
-        display_main_menu()
-        choice = input("Enter your choice (0-20): ").strip()
+        display_main_menu(client)
+        choice = input("Enter your choice (0-23): ").strip()
         
         try:
             if choice == '0':
@@ -755,8 +855,14 @@ def main():
                     client.run_complete_test_suite()
                 else:
                     print("🚫 Test suite cancelled")
+            elif choice == '21':
+                client.login()
+            elif choice == '22':
+                client.logout()
+            elif choice == '23':
+                client.get_my_tickets()
             else:
-                print("❌ Invalid choice. Please select 0-20.")
+                print("❌ Invalid choice. Please select 0-23.")
                 
             input("\nPress Enter to continue...")
             

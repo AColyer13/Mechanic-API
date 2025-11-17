@@ -2,7 +2,7 @@
 
 from flask import Flask
 from config import config
-from application.extensions import db, ma
+from application.extensions import db, ma, migrate, limiter, cache
 
 def create_app(config_name='development'):
     """Create and configure the Flask application."""
@@ -11,9 +11,16 @@ def create_app(config_name='development'):
     # Load configuration
     app.config.from_object(config[config_name])
     
+    # Add caching configuration
+    app.config['CACHE_TYPE'] = 'SimpleCache'
+    app.config['CACHE_DEFAULT_TIMEOUT'] = 300
+    
     # Initialize extensions
     db.init_app(app)
     ma.init_app(app)
+    migrate.init_app(app, db)
+    limiter.init_app(app)
+    cache.init_app(app)
     
     # Register blueprints
     from application.blueprints.customer import customer_bp

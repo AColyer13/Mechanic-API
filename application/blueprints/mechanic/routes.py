@@ -3,13 +3,14 @@
 from flask import request, jsonify
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError
-from application.extensions import db
+from application.extensions import db, limiter, cache
 from application.models import Mechanic
 from .schemas import mechanic_schema, mechanics_schema, mechanic_simple_schema, mechanics_simple_schema
 from . import mechanic_bp
 
 
 @mechanic_bp.route('/', methods=['POST'])
+@limiter.limit("10 per minute")  # Rate limiting: max 10 mechanic creations per minute
 def create_mechanic():
     """Create a new mechanic."""
     try:
@@ -19,6 +20,9 @@ def create_mechanic():
         # Save to database
         db.session.add(mechanic_data)
         db.session.commit()
+        
+        # Clear the cache for all mechanics list
+        cache.delete('all_mechanics')
         
         # Return serialized mechanic
         return mechanic_simple_schema.dump(mechanic_data), 201
@@ -34,6 +38,7 @@ def create_mechanic():
 
 
 @mechanic_bp.route('/', methods=['GET'])
+@cache.cached(timeout=300, key_prefix='all_mechanics')  # Cache for 5 minutes
 def get_mechanics():
     """Retrieve all mechanics."""
     try:
@@ -41,6 +46,7 @@ def get_mechanics():
         return mechanics_simple_schema.dump(mechanics), 200
     except Exception as e:
         return {'error': 'An error occurred while retrieving mechanics'}, 500
+
 
 
 @mechanic_bp.route('/<int:mechanic_id>', methods=['GET'])

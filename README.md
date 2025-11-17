@@ -1,6 +1,6 @@
 # Mechanic Shop API
 
-A RESTful API for managing a mechanic shop built with Flask using the Application Factory Pattern. This API allows you to manage customers, mechanics, and service tickets with full CRUD operations and mechanic assignment capabilities.
+A RESTful API for managing a mechanic shop built with Flask using the Application Factory Pattern. This API allows you to manage customers, mechanics, and service tickets with full CRUD operations, mechanic assignment capabilities, rate limiting, and caching.
 
 ## Features
 
@@ -11,11 +11,44 @@ A RESTful API for managing a mechanic shop built with Flask using the Applicatio
 - **Database Relationships**: Many-to-many relationships between mechanics and service tickets
 - **Input Validation**: Comprehensive validation using Marshmallow schemas
 - **Error Handling**: Proper error responses and status codes
+- **Rate Limiting**: Protection against API abuse with configurable limits (Flask-Limiter)
+- **Caching**: Performance optimization with in-memory caching (Flask-Caching)
+- **Database Migrations**: Schema versioning with Flask-Migrate
+- **MySQL Database**: Persistent data storage with MySQL
+- **Interactive Client**: Command-line client for easy API testing
+
+## Technical Stack
+
+- **Framework**: Flask 3.0.0
+- **Database**: MySQL with SQLAlchemy ORM
+- **Serialization**: Marshmallow for data validation and serialization
+- **Rate Limiting**: Flask-Limiter (10 requests/minute on create endpoints)
+- **Caching**: Flask-Caching (5-minute cache on GET all endpoints)
+- **Database Migrations**: Flask-Migrate
+- **API Testing**: Custom Python client with requests library
+
+## Rate Limiting & Caching
+
+### Rate Limiting
+The API implements rate limiting on critical endpoints to prevent abuse:
+- **POST /customers/**: Limited to 10 requests per minute
+- **POST /mechanics/**: Limited to 10 requests per minute
+- **Global Default**: 200 requests per day, 50 requests per hour for all other routes
+
+When rate limit is exceeded, you'll receive a `429 Too Many Requests` response.
+
+### Caching
+Performance-critical endpoints are cached to reduce database load:
+- **GET /customers/**: Results cached for 5 minutes
+- **GET /mechanics/**: Results cached for 5 minutes
+
+Cache is automatically invalidated when new records are created to ensure data freshness.
 
 ## Setup Instructions
 
 ### Prerequisites
 - Python 3.8 or higher
+- MySQL 8.0 or higher
 - pip (Python package manager)
 
 ### Installation
@@ -25,19 +58,51 @@ A RESTful API for managing a mechanic shop built with Flask using the Applicatio
    cd "path/to/Mechanic API"
    ```
 
-2. **The project uses a virtual environment which should be automatically configured**
+2. **Create and configure MySQL database**
+   ```sql
+   CREATE DATABASE mechanicshopdata;
+   ```
 
-3. **Install dependencies using the virtual environment**
+3. **Configure environment variables**
+   Create a `.env` file in the project root:
+   ```properties
+   FLASK_ENV=development
+   SECRET_KEY=dev-secret-key-change-in-production
+   DATABASE_URL=mysql+mysqlconnector://root:password@localhost/mechanicshopdata
+   DEBUG=True
+   ```
+
+4. **Install dependencies using the virtual environment**
    ```powershell
    .venv\Scripts\python.exe -m pip install -r requirements.txt
    ```
 
-4. **Run the application**
+5. **Run the application**
    ```powershell
    .venv\Scripts\python.exe app.py
    ```
 
 The API will be available at `http://127.0.0.1:5000`
+
+## Using the Interactive Client
+
+The project includes an interactive command-line client for easy API testing:
+
+```powershell
+.venv\Scripts\python.exe client.py
+```
+
+The client provides:
+- **Menu-driven interface** for all API operations
+- **Automated test suite** to create sample data
+- **Input validation** and error handling
+- **Formatted JSON responses**
+
+### Client Features
+- Create, read, update, and delete customers, mechanics, and service tickets
+- Assign/remove mechanics from service tickets
+- Query tickets by customer or mechanic
+- Run complete automated test suite (creates sample data and tests all endpoints)
 
 ## Resolving Common Issues
 
