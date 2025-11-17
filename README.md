@@ -127,20 +127,6 @@ The API uses caching to improve performance and reduce database load:
 
 When rate limits are exceeded, the API returns a `429 Too Many Requests` response. Cached responses improve response times significantly for frequently accessed endpoints.
 
-## Resolving Common Issues
-
-### "pip is not recognized" Error
-If you see this error, use the full path to the Python executable:
-```powershell
-.venv\Scripts\python.exe -m pip install [package-name]
-```
-
-### PowerShell Execution Policy
-If you can't activate the virtual environment due to execution policy, use the Python executable directly:
-```powershell
-.venv\Scripts\python.exe app.py
-```
-
 ### Installing Flask-Limiter and Flask-Caching
 If these packages are missing, install them manually:
 ```powershell
@@ -386,9 +372,3 @@ Import the following collection structure in Postman:
 - **Validation**: Comprehensive input validation with custom field validators
 - **Error Handling**: Proper HTTP status codes and error messages
 - **Database Design**: Efficient many-to-many relationships with association tables
-
-### Project Cleanup Completed
-- ✅ Removed duplicate root `schemas.py`, `models.py`, and `blueprints/` folder
-- ✅ Consolidated all schemas into their respective blueprint modules
-- ✅ Fixed conflicting blueprint registrations
-- ✅ Maintained single source of truth for all components
