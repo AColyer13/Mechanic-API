@@ -4,15 +4,16 @@ from flask import request, jsonify
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func, desc
-from application.extensions import db
+from application.extensions import db, limiter, cache
 from application.models import Mechanic, ServiceTicket, service_ticket_mechanics
 from .schemas import mechanic_schema, mechanics_schema, mechanic_simple_schema, mechanics_simple_schema
 from . import mechanic_bp
 
 
 @mechanic_bp.route('/', methods=['POST'])
+@limiter.limit("5 per hour")  # Rate limit: only 5 mechanic registrations per hour
 def create_mechanic():
-    """Create a new mechanic."""
+    """Create a new mechanic with rate limiting to prevent spam registration."""
     try:
         # Validate and deserialize input
         mechanic_data = mechanic_schema.load(request.json)
@@ -35,8 +36,13 @@ def create_mechanic():
 
 
 @mechanic_bp.route('/', methods=['GET'])
+@cache.cached(timeout=300)  # Cache for 5 minutes (300 seconds)
 def get_mechanics():
-    """Retrieve all mechanics."""
+    """
+    Retrieve all mechanics with caching.
+    Caching is important here because the list of mechanics doesn't change frequently
+    and this endpoint might be called often for display purposes.
+    """
     try:
         mechanics = Mechanic.query.all()
         return mechanics_simple_schema.dump(mechanics), 200
