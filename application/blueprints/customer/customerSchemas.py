@@ -2,7 +2,7 @@
 
 from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
 from marshmallow import fields, validate, ValidationError, pre_load, post_load
-from passlib.hash import bcrypt
+import bcrypt
 from application.models import Customer
 from application.extensions import db, ma
 
@@ -42,7 +42,11 @@ class CustomerSchema(SQLAlchemyAutoSchema):
             
             # Hash password if present
             if 'password' in data and data['password']:
-                data['password'] = bcrypt.hash(data['password'])
+                # Hash password using bcrypt
+                password_bytes = data['password'].encode('utf-8')
+                salt = bcrypt.gensalt()
+                hashed = bcrypt.hashpw(password_bytes, salt)
+                data['password'] = hashed.decode('utf-8')
         
         return data
 

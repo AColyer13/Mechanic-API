@@ -3,7 +3,7 @@
 from flask import request, jsonify
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError
-from passlib.hash import bcrypt
+import bcrypt
 from application.extensions import db, limiter, cache, encode_token, token_required
 from application.models import Customer, ServiceTicket
 from .customerSchemas import customer_schema, customers_schema, customer_simple_schema, customers_simple_schema, login_schema
@@ -24,7 +24,9 @@ def login():
             return {'error': 'Invalid email or password'}, 401
         
         # Verify password
-        if not bcrypt.verify(credentials['password'], customer.password):
+        password_bytes = credentials['password'].encode('utf-8')
+        stored_hash = customer.password.encode('utf-8')
+        if not bcrypt.checkpw(password_bytes, stored_hash):
             return {'error': 'Invalid email or password'}, 401
         
         # Generate token
