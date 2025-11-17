@@ -3,8 +3,9 @@
 from flask import request, jsonify
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, desc
 from application.extensions import db
-from application.models import Mechanic
+from application.models import Mechanic, ServiceTicket, service_ticket_mechanics
 from .schemas import mechanic_schema, mechanics_schema, mechanic_simple_schema, mechanics_simple_schema
 from . import mechanic_bp
 
@@ -102,3 +103,33 @@ def delete_mechanic(mechanic_id):
     except Exception as e:
         db.session.rollback()
         return {'error': 'An error occurred while deleting the mechanic'}, 500
+
+
+@mechanic_bp.route('/by-workload', methods=['GET'])
+def get_mechanics_by_workload():
+    """Get mechanics ordered by the number of tickets they've worked on (most to least)."""
+    try:
+        # Query mechanics with ticket count using LEFT JOIN and GROUP BY
+        mechanics_with_counts = db.session.query(
+            Mechanic,
+            func.count(service_ticket_mechanics.c.service_ticket_id).label('ticket_count')
+        ).outerjoin(
+            service_ticket_mechanics, 
+            Mechanic.id == service_ticket_mechanics.c.mechanic_id
+        ).group_by(Mechanic.id).order_by(desc('ticket_count')).all()
+        
+        # Format the response
+        result = []
+        for mechanic, ticket_count in mechanics_with_counts:
+            mechanic_data = mechanic_simple_schema.dump(mechanic)
+            mechanic_data['ticket_count'] = ticket_count
+            result.append(mechanic_data)
+        
+        return {
+            'mechanics': result,
+            'total_mechanics': len(result),
+            'message': 'Mechanics ordered by workload (most tickets first)'
+        }, 200
+        
+    except Exception as e:
+        return {'error': 'An error occurred while retrieving mechanics by workload'}, 500

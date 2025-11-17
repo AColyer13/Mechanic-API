@@ -3,8 +3,9 @@
 from flask import request, jsonify
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 from datetime import datetime
-from application.extensions import db
+from application.extensions import db, limiter, cache, token_required
 from application.models import ServiceTicket, Customer, Mechanic
 from .schemas import (service_ticket_schema, service_tickets_schema, 
                      service_ticket_simple_schema, service_tickets_simple_schema)
@@ -12,11 +13,17 @@ from . import service_ticket_bp
 
 
 @service_ticket_bp.route('/', methods=['POST'])
+@token_required
+@limiter.limit("20 per hour")
 def create_service_ticket():
     """Create a new service ticket."""
     try:
         # Validate and deserialize input
         ticket_data = service_ticket_schema.load(request.json)
+        
+        # Ensure customer can only create tickets for themselves
+        if ticket_data.get('customer_id') != request.customer_id:
+            return jsonify({'message': 'Unauthorized - can only create tickets for yourself'}), 403
         
         # Verify customer exists
         customer = Customer.query.get(ticket_data.customer_id)
@@ -24,11 +31,12 @@ def create_service_ticket():
             return {'error': 'Customer not found'}, 404
         
         # Save to database
-        db.session.add(ticket_data)
+        new_ticket = ServiceTicket(**ticket_data)
+        db.session.add(new_ticket)
         db.session.commit()
         
         # Return serialized ticket
-        return service_ticket_schema.dump(ticket_data), 201
+        return service_ticket_schema.dump(new_ticket), 201
         
     except ValidationError as err:
         return {'errors': err.messages}, 400
@@ -61,12 +69,19 @@ def get_service_ticket(ticket_id):
 
 
 @service_ticket_bp.route('/<int:ticket_id>', methods=['PUT'])
+@token_required
 def update_service_ticket(ticket_id):
     """Update a specific service ticket."""
     try:
-        ticket = ServiceTicket.query.get(ticket_id)
+        # Verify the ticket belongs to the authenticated customer
+        query = select(ServiceTicket).where(
+            ServiceTicket.id == ticket_id,
+            ServiceTicket.customer_id == request.customer_id
+        )
+        ticket = db.session.execute(query).scalar_one_or_none()
+        
         if not ticket:
-            return {'error': 'Service ticket not found'}, 404
+            return jsonify({'message': 'Service ticket not found or unauthorized'}), 404
         
         # Get the current status before update
         old_status = ticket.status
@@ -193,3 +208,127 @@ def get_tickets_by_mechanic(mechanic_id):
         
     except Exception as e:
         return {'error': 'An error occurred while retrieving mechanic tickets'}, 500
+
+
+@service_ticket_bp.route('/<int:ticket_id>/edit', methods=['PUT'])
+def edit_ticket_mechanics(ticket_id):
+    """Add and remove mechanics from a service ticket in bulk."""
+    try:
+        # Get the service ticket
+        ticket = ServiceTicket.query.get(ticket_id)
+        if not ticket:
+            return {'error': 'Service ticket not found'}, 404
+        
+        data = request.get_json()
+        if not data:
+            return {'error': 'No data provided'}, 400
+        
+        remove_ids = data.get('remove_ids', [])
+        add_ids = data.get('add_ids', [])
+        
+        # Validate that IDs are lists
+        if not isinstance(remove_ids, list) or not isinstance(add_ids, list):
+            return {'error': 'remove_ids and add_ids must be arrays'}, 400
+        
+        # Track changes for response
+        removed_mechanics = []
+        added_mechanics = []
+        errors = []
+        
+        # Remove mechanics
+        for mechanic_id in remove_ids:
+            if not isinstance(mechanic_id, int):
+                errors.append(f"Invalid mechanic ID in remove_ids: {mechanic_id}")
+                continue
+                
+            mechanic = Mechanic.query.get(mechanic_id)
+            if not mechanic:
+                errors.append(f"Mechanic not found: {mechanic_id}")
+                continue
+            
+            if mechanic in ticket.mechanics:
+                ticket.mechanics.remove(mechanic)
+                removed_mechanics.append({
+                    'id': mechanic.id,
+                    'name': f"{mechanic.first_name} {mechanic.last_name}"
+                })
+            else:
+                errors.append(f"Mechanic {mechanic_id} was not assigned to this ticket")
+        
+        # Add mechanics
+        for mechanic_id in add_ids:
+            if not isinstance(mechanic_id, int):
+                errors.append(f"Invalid mechanic ID in add_ids: {mechanic_id}")
+                continue
+                
+            mechanic = Mechanic.query.get(mechanic_id)
+            if not mechanic:
+                errors.append(f"Mechanic not found: {mechanic_id}")
+                continue
+            
+            if mechanic not in ticket.mechanics:
+                ticket.mechanics.append(mechanic)
+                added_mechanics.append({
+                    'id': mechanic.id,
+                    'name': f"{mechanic.first_name} {mechanic.last_name}"
+                })
+            else:
+                errors.append(f"Mechanic {mechanic_id} is already assigned to this ticket")
+        
+        # Commit changes
+        db.session.commit()
+        
+        # Build response
+        response = {
+            'message': f'Mechanics updated for ticket {ticket_id}',
+            'ticket_id': ticket_id,
+            'changes': {
+                'added': added_mechanics,
+                'removed': removed_mechanics
+            }
+        }
+        
+        if errors:
+            response['warnings'] = errors
+        
+        return response, 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return {'error': 'An error occurred while updating mechanics'}, 500
+
+
+@service_ticket_bp.route('/<int:ticket_id>/add-part/<int:part_id>', methods=['PUT'])
+def add_part_to_ticket(ticket_id, part_id):
+    """Add an inventory part to a service ticket."""
+    try:
+        ticket = ServiceTicket.query.get(ticket_id)
+        if not ticket:
+            return {'error': 'Service ticket not found'}, 404
+        
+        # Import Inventory here to avoid circular import
+        from application.models import Inventory
+        part = Inventory.query.get(part_id)
+        if not part:
+            return {'error': 'Inventory part not found'}, 404
+        
+        # Check if part is already added to the ticket
+        if part in ticket.inventory_parts:
+            return {'error': 'Part is already added to this ticket'}, 409
+        
+        # Add part to ticket
+        ticket.inventory_parts.append(part)
+        db.session.commit()
+        
+        return {
+            'message': f'Part "{part.name}" (ID: {part_id}) added to ticket {ticket_id}',
+            'part_info': {
+                'id': part.id,
+                'name': part.name,
+                'price': part.price
+            }
+        }, 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return {'error': 'An error occurred while adding the part to the ticket'}, 500

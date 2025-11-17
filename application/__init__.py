@@ -28,10 +28,12 @@ def create_app(config_name='development'):
     from .blueprints.customer import customer_bp
     from .blueprints.mechanic import mechanic_bp
     from .blueprints.service_ticket import service_ticket_bp
+    from .blueprints.inventory import inventory_bp
     
     app.register_blueprint(customer_bp, url_prefix='/customers')
     app.register_blueprint(mechanic_bp, url_prefix='/mechanics')
     app.register_blueprint(service_ticket_bp, url_prefix='/service-tickets')
+    app.register_blueprint(inventory_bp, url_prefix='/inventory')
     
     # Create database tables with error handling
     with app.app_context():
@@ -54,7 +56,8 @@ def create_app(config_name='development'):
             'endpoints': {
                 'customers': '/customers',
                 'mechanics': '/mechanics',
-                'service_tickets': '/service-tickets'
+                'service_tickets': '/service-tickets',
+                'inventory': '/inventory'
             },
             'database_status': 'Check console for database connection status'
         }

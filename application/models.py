@@ -7,6 +7,12 @@ service_ticket_mechanics = db.Table('service_ticket_mechanics',
     db.Column('mechanic_id', db.Integer, db.ForeignKey('mechanic.id'), primary_key=True)
 )
 
+# Association table for many-to-many relationship between service tickets and inventory parts
+service_ticket_inventory = db.Table('service_ticket_inventory',
+    db.Column('service_ticket_id', db.Integer, db.ForeignKey('service_ticket.id'), primary_key=True),
+    db.Column('inventory_id', db.Integer, db.ForeignKey('inventory.id'), primary_key=True)
+)
+
 class Customer(db.Model):
     """Customer model for the mechanic shop"""
     __tablename__ = 'customer'
@@ -48,6 +54,24 @@ class Mechanic(db.Model):
     def __repr__(self):
         return f'<Mechanic {self.first_name} {self.last_name}>'
 
+class Inventory(db.Model):
+    """Inventory model for tracking parts and supplies"""
+    __tablename__ = 'inventory'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Many-to-many relationship with service tickets
+    service_tickets = db.relationship('ServiceTicket', 
+                                    secondary=service_ticket_inventory, 
+                                    back_populates='inventory_parts',
+                                    lazy='dynamic')
+    
+    def __repr__(self):
+        return f'<Inventory {self.name}>'
+
 class ServiceTicket(db.Model):
     """Service ticket model for tracking repair jobs"""
     __tablename__ = 'service_ticket'
@@ -71,6 +95,10 @@ class ServiceTicket(db.Model):
                                secondary=service_ticket_mechanics, 
                                back_populates='service_tickets',
                                lazy='dynamic')
+    inventory_parts = db.relationship('Inventory', 
+                                    secondary=service_ticket_inventory, 
+                                    back_populates='service_tickets',
+                                    lazy='dynamic')
     
     def __repr__(self):
         return f'<ServiceTicket {self.id} - {self.status}>'

@@ -46,3 +46,6 @@ customers_schema = CustomerSchema(many=True)
 # Schema without service tickets for simpler responses
 customer_simple_schema = CustomerSchema(exclude=['service_tickets'])
 customers_simple_schema = CustomerSchema(many=True, exclude=['service_tickets'])
+
+# Login schema - only email and password fields
+login_schema = CustomerSchema(only=('email', 'password'))

@@ -135,22 +135,6 @@ If these packages are missing, install them manually:
 
 ## API Endpoints
 
-### Customers (`/customers`)
-
-- `POST /customers/` - Create a new customer *(Rate Limited: 10/hour)*
-- `GET /customers/` - Get all customers *(Cached: 10 minutes)*
-- `GET /customers/<id>` - Get a specific customer
-- `PUT /customers/<id>` - Update a customer
-- `DELETE /customers/<id>` - Delete a customer
-
-### Mechanics (`/mechanics`)
-
-- `POST /mechanics/` - Create a new mechanic *(Rate Limited: 5/hour)*
-- `GET /mechanics/` - Get all mechanics *(Cached: 5 minutes)*
-- `GET /mechanics/<id>` - Get a specific mechanic
-- `PUT /mechanics/<id>` - Update a mechanic
-- `DELETE /mechanics/<id>` - Delete a mechanic
-
 ### Service Tickets (`/service-tickets`)
 
 - `POST /service-tickets/` - Create a new service ticket *(Rate Limited: 20/hour)*
@@ -160,8 +144,26 @@ If these packages are missing, install them manually:
 - `DELETE /service-tickets/<id>` - Delete a service ticket
 - `PUT /service-tickets/<ticket_id>/assign-mechanic/<mechanic_id>` - Assign mechanic to ticket
 - `PUT /service-tickets/<ticket_id>/remove-mechanic/<mechanic_id>` - Remove mechanic from ticket
+- `PUT /service-tickets/<ticket_id>/edit` - **NEW**: Bulk add/remove mechanics from ticket
 - `GET /service-tickets/customer/<customer_id>` - Get all tickets for a customer
 - `GET /service-tickets/mechanic/<mechanic_id>` - Get all tickets for a mechanic
+
+### Mechanics (`/mechanics`)
+
+- `POST /mechanics/` - Create a new mechanic *(Rate Limited: 5/hour)*
+- `GET /mechanics/` - Get all mechanics *(Cached: 5 minutes)*
+- `GET /mechanics/<id>` - Get a specific mechanic
+- `PUT /mechanics/<id>` - Update a mechanic
+- `DELETE /mechanics/<id>` - Delete a mechanic
+- `GET /mechanics/by-workload` - **NEW**: Get mechanics ordered by ticket count
+
+### Customers (`/customers`)
+
+- `POST /customers/` - Create a new customer *(Rate Limited: 10/hour)*
+- `GET /customers/` - Get all customers *(Cached: 10 minutes)* **[Now with Pagination]**
+- `GET /customers/<id>` - Get a specific customer
+- `PUT /customers/<id>` - Update a customer
+- `DELETE /customers/<id>` - Delete a customer
 
 ## Sample API Usage
 
@@ -211,6 +213,32 @@ curl -X POST http://localhost:5000/service-tickets/ \
 ### Assign Mechanic to Service Ticket
 ```bash
 curl -X PUT http://localhost:5000/service-tickets/1/assign-mechanic/1
+```
+
+## New API Usage Examples
+
+### Bulk Update Mechanics on Service Ticket
+```bash
+curl -X PUT http://localhost:5000/service-tickets/1/edit \
+  -H "Content-Type: application/json" \
+  -d '{
+    "add_ids": [1, 2, 3],
+    "remove_ids": [4, 5]
+  }'
+```
+
+### Get Mechanics by Workload
+```bash
+curl -X GET http://localhost:5000/mechanics/by-workload
+```
+
+### Get Customers with Pagination
+```bash
+# Get first page (10 customers per page by default)
+curl -X GET http://localhost:5000/customers/
+
+# Get specific page with custom page size
+curl -X GET "http://localhost:5000/customers/?page=2&per_page=5"
 ```
 
 ## Database Models
