@@ -22,6 +22,7 @@ class MechanicShopAPIClient:
         self.session = requests.Session()
         self.token = None
         self.logged_in_customer_id = None
+        self.logged_in_customer_email = None
         
     def make_request(self, method, endpoint, data=None, params=None, use_token=False):
         """Make HTTP request to API and handle response"""
@@ -95,9 +96,10 @@ class MechanicShopAPIClient:
         response = self.make_request('POST', '/customers/login', data)
         if response and 'token' in response:
             self.token = response['token']
-            self.logged_in_customer_id = response.get('customer_id')
+            self.logged_in_customer_id = response.get('customer', {}).get('id')
+            self.logged_in_customer_email = response.get('customer', {}).get('email')
             print(f"\n✅ Login successful!")
-            print(f"👤 Logged in as Customer ID: {self.logged_in_customer_id}")
+            print(f"👤 Logged in as: {self.logged_in_customer_email}")
             print(f"🔑 Token: {self.token[:20]}...")
         return response
     
@@ -107,6 +109,7 @@ class MechanicShopAPIClient:
             print("\n👋 Logging out...")
             self.token = None
             self.logged_in_customer_id = None
+            self.logged_in_customer_email = None
             print("✅ Logged out successfully")
         else:
             print("\nℹ️ Not currently logged in")
@@ -690,7 +693,7 @@ def display_main_menu(client):
     
     # Show login status
     if client.token:
-        print(f"🔐 Logged in as Customer ID: {client.logged_in_customer_id}")
+        print(f"🔐 Logged in as: {client.logged_in_customer_email}")
     else:
         print("🔓 Not logged in")
     print("=" * 60)
