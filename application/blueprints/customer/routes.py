@@ -7,7 +7,7 @@ from sqlalchemy import select
 from application.extensions import db, limiter, cache, encode_token, token_required
 from application.models import Customer, ServiceTicket
 from werkzeug.security import check_password_hash
-from .customerSchemas import customer_schema, customers_schema, customer_simple_schema, customers_simple_schema, login_schema
+from .customerSchemas import customer_schema, customers_schema, customer_simple_schema, customers_simple_schema, customer_registration_schema, login_schema
 from . import customer_bp
 
 
@@ -15,8 +15,8 @@ from . import customer_bp
 def create_customer():
     """Create a new customer."""
     try:
-        # Validate and deserialize input
-        customer_data = customer_schema.load(request.json)
+        # Validate and deserialize input (includes password hashing)
+        customer_data = customer_registration_schema.load(request.json)
         
         # Save to database
         db.session.add(customer_data)
