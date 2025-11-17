@@ -26,10 +26,12 @@ def create_app(config_name='development'):
     from application.blueprints.customer import customer_bp
     from application.blueprints.mechanic import mechanic_bp
     from application.blueprints.service_ticket import service_ticket_bp
+    from application.blueprints.inventory import inventory_bp
     
     app.register_blueprint(customer_bp, url_prefix='/customers')
     app.register_blueprint(mechanic_bp, url_prefix='/mechanics')
     app.register_blueprint(service_ticket_bp, url_prefix='/service-tickets')
+    app.register_blueprint(inventory_bp, url_prefix='/inventory')
     
     # Create database tables
     with app.app_context():
@@ -43,7 +45,8 @@ def create_app(config_name='development'):
             'endpoints': {
                 'customers': '/customers',
                 'mechanics': '/mechanics',
-                'service_tickets': '/service-tickets'
+                'service_tickets': '/service-tickets',
+                'inventory': '/inventory'
             }
         }
     

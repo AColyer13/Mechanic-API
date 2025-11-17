@@ -9,6 +9,12 @@ mechanic_service_ticket = db.Table('mechanic_service_ticket',
     db.Column('service_ticket_id', db.Integer, db.ForeignKey('service_ticket.id'), primary_key=True)
 )
 
+# Association table for many-to-many relationship between Inventory and ServiceTicket
+inventory_service_ticket = db.Table('inventory_service_ticket',
+    db.Column('inventory_id', db.Integer, db.ForeignKey('inventory.id'), primary_key=True),
+    db.Column('service_ticket_id', db.Integer, db.ForeignKey('service_ticket.id'), primary_key=True)
+)
+
 class Customer(db.Model):
     """Customer model."""
     __tablename__ = 'customer'
@@ -61,3 +67,17 @@ class ServiceTicket(db.Model):
     
     # Many-to-many relationship with mechanics
     mechanics = db.relationship('Mechanic', secondary=mechanic_service_ticket, back_populates='service_tickets')
+    
+    # Many-to-many relationship with inventory parts
+    inventory_parts = db.relationship('Inventory', secondary=inventory_service_ticket, back_populates='service_tickets')
+
+class Inventory(db.Model):
+    """Inventory model for parts."""
+    __tablename__ = 'inventory'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    
+    # Many-to-many relationship with service tickets
+    service_tickets = db.relationship('ServiceTicket', secondary=inventory_service_ticket, back_populates='inventory_parts')
