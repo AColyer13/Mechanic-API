@@ -4,17 +4,19 @@ A RESTful API for managing a mechanic shop built with Flask using the Applicatio
 
 ## Features
 
-- **Customer Management**: Full CRUD operations for customers
+- **Customer Management**: Full CRUD operations for customers with authentication
 - **Mechanic Management**: Full CRUD operations for mechanics
+- **Inventory Management**: Full CRUD operations for inventory parts and supplies
 - **Service Ticket Management**: Create, read, update, and delete service tickets
 - **Mechanic Assignment**: Assign and remove mechanics from service tickets
-- **Database Relationships**: Many-to-many relationships between mechanics and service tickets
-- **Input Validation**: Comprehensive validation using Marshmallow schemas
+- **Inventory Tracking**: Associate inventory parts with service tickets
+- **Database Relationships**: Many-to-many relationships between mechanics/service tickets and inventory/service tickets
+- **Input Validation**: Comprehensive validation using Marshmallow schemas with custom validations
 - **Error Handling**: Proper error responses and status codes
 - **Rate Limiting**: Protection against API abuse with Flask-Limiter
 - **Caching**: Performance optimization with Flask-Caching for frequently accessed data
-- **Data Validation**: Comprehensive input validation using Marshmallow schemas
-- **Modular Architecture**: Clean separation using Flask blueprints
+- **Authentication**: Token-based authentication system
+- **Modular Architecture**: Clean separation using Flask blueprints with Application Factory pattern
 
 ## Project Structure
 
@@ -23,25 +25,33 @@ A RESTful API for managing a mechanic shop built with Flask using the Applicatio
 ├── /application
 │   ├── __init__.py                 # Application factory with create_app()
 │   ├── extensions.py              # Flask extensions initialization (SQLAlchemy, Marshmallow, Migrate, Limiter, Cache)
-│   ├── models.py                  # Database models
+│   ├── models.py                  # Complete database models (Customer, Mechanic, Inventory, ServiceTicket)
 │   └── /blueprints
 │       ├── /customer
 │       │   ├── __init__.py        # Customer blueprint initialization
 │       │   ├── routes.py          # Customer CRUD routes (with rate limiting & caching)
-│       │   └── customerSchemas.py # Customer Marshmallow schemas
+│       │   └── customerSchemas.py # Customer Marshmallow schemas with validation
 │       ├── /mechanic
 │       │   ├── __init__.py        # Mechanic blueprint initialization
 │       │   ├── routes.py          # Mechanic CRUD routes (with rate limiting & caching)
-│       │   └── schemas.py         # Mechanic Marshmallow schemas
-│       └── /service_ticket
-│           ├── __init__.py        # Service ticket blueprint initialization
-│           ├── routes.py          # Service ticket routes (with rate limiting & caching)
-│           └── schemas.py         # Service ticket Marshmallow schemas
+│       │   └── schemas.py         # Mechanic Marshmallow schemas with validation
+│       ├── /inventory
+│       │   ├── __init__.py        # Inventory blueprint initialization
+│       │   ├── routes.py          # Inventory CRUD routes
+│       │   └── schemas.py         # Inventory Marshmallow schemas with validation
+│       ├── /service_ticket
+│       │   ├── __init__.py        # Service ticket blueprint initialization
+│       │   ├── routes.py          # Service ticket routes (with rate limiting & caching)
+│       │   └── schemas.py         # Service ticket Marshmallow schemas with validation
+│       └── /orders
+│           └── routes.py          # Orders routes
+├── /utils
+│   └── auth.py                    # Authentication utilities
 ├── app.py                         # Main application entry point
 ├── config.py                      # Configuration settings
 ├── requirements.txt               # Python dependencies (includes Flask-Limiter & Flask-Caching)
 ├── README.md                      # Project documentation
-└── .env.example                   # Environment variables template
+└── .env                           # Environment variables (configure your database here)
 ```
 
 ## Setup Instructions
@@ -76,10 +86,14 @@ A RESTful API for managing a mechanic shop built with Flask using the Applicatio
    - Flask-Caching
    - marshmallow-sqlalchemy
 
-4. **Set up environment variables (optional)**
+4. **Set up environment variables**
    ```powershell
-   copy .env.example .env
-   # Edit .env file with your configuration
+   # Create .env file with your database configuration
+   # Example for MySQL:
+   # DATABASE_URL=mysql+mysqlconnector://root:password@localhost/mechanicshopdata
+   # 
+   # Or use SQLite for development:
+   # DATABASE_URL=sqlite:///mechanic_shop.db
    ```
 
 5. **Run the application**
@@ -135,6 +149,32 @@ If these packages are missing, install them manually:
 
 ## API Endpoints
 
+### Customers (`/customers`)
+
+- `POST /customers/` - Create a new customer *(Rate Limited: 10/hour)*
+- `GET /customers/` - Get all customers *(Cached: 10 minutes)* **[With Pagination]**
+- `GET /customers/<id>` - Get a specific customer
+- `PUT /customers/<id>` - Update a customer
+- `DELETE /customers/<id>` - Delete a customer
+- `POST /customers/login` - Customer authentication *(Rate Limited: 5/minute)*
+
+### Mechanics (`/mechanics`)
+
+- `POST /mechanics/` - Create a new mechanic *(Rate Limited: 5/hour)*
+- `GET /mechanics/` - Get all mechanics *(Cached: 5 minutes)*
+- `GET /mechanics/<id>` - Get a specific mechanic
+- `PUT /mechanics/<id>` - Update a mechanic
+- `DELETE /mechanics/<id>` - Delete a mechanic
+- `GET /mechanics/by-workload` - Get mechanics ordered by ticket count
+
+### Inventory (`/inventory`)
+
+- `POST /inventory/` - Create a new inventory item *(Token Required)*
+- `GET /inventory/` - Get all inventory items
+- `GET /inventory/<id>` - Get a specific inventory item
+- `PUT /inventory/<id>` - Update an inventory item *(Token Required)*
+- `DELETE /inventory/<id>` - Delete an inventory item *(Token Required)*
+
 ### Service Tickets (`/service-tickets`)
 
 - `POST /service-tickets/` - Create a new service ticket *(Rate Limited: 20/hour)*
@@ -144,26 +184,9 @@ If these packages are missing, install them manually:
 - `DELETE /service-tickets/<id>` - Delete a service ticket
 - `PUT /service-tickets/<ticket_id>/assign-mechanic/<mechanic_id>` - Assign mechanic to ticket
 - `PUT /service-tickets/<ticket_id>/remove-mechanic/<mechanic_id>` - Remove mechanic from ticket
-- `PUT /service-tickets/<ticket_id>/edit` - **NEW**: Bulk add/remove mechanics from ticket
+- `PUT /service-tickets/<ticket_id>/edit` - Bulk add/remove mechanics from ticket
 - `GET /service-tickets/customer/<customer_id>` - Get all tickets for a customer
 - `GET /service-tickets/mechanic/<mechanic_id>` - Get all tickets for a mechanic
-
-### Mechanics (`/mechanics`)
-
-- `POST /mechanics/` - Create a new mechanic *(Rate Limited: 5/hour)*
-- `GET /mechanics/` - Get all mechanics *(Cached: 5 minutes)*
-- `GET /mechanics/<id>` - Get a specific mechanic
-- `PUT /mechanics/<id>` - Update a mechanic
-- `DELETE /mechanics/<id>` - Delete a mechanic
-- `GET /mechanics/by-workload` - **NEW**: Get mechanics ordered by ticket count
-
-### Customers (`/customers`)
-
-- `POST /customers/` - Create a new customer *(Rate Limited: 10/hour)*
-- `GET /customers/` - Get all customers *(Cached: 10 minutes)* **[Now with Pagination]**
-- `GET /customers/<id>` - Get a specific customer
-- `PUT /customers/<id>` - Update a customer
-- `DELETE /customers/<id>` - Delete a customer
 
 ## Sample API Usage
 
@@ -195,6 +218,17 @@ curl -X POST http://localhost:5000/mechanics/ \
   }'
 ```
 
+### Create an Inventory Item
+```bash
+curl -X POST http://localhost:5000/inventory/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{
+    "name": "Brake Pads",
+    "price": 45.99
+  }'
+```
+
 ### Create a Service Ticket
 ```bash
 curl -X POST http://localhost:5000/service-tickets/ \
@@ -210,12 +244,22 @@ curl -X POST http://localhost:5000/service-tickets/ \
   }'
 ```
 
+### Customer Login
+```bash
+curl -X POST http://localhost:5000/customers/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john.doe@email.com",
+    "password": "your_password"
+  }'
+```
+
 ### Assign Mechanic to Service Ticket
 ```bash
 curl -X PUT http://localhost:5000/service-tickets/1/assign-mechanic/1
 ```
 
-## New API Usage Examples
+## Advanced API Usage Examples
 
 ### Bulk Update Mechanics on Service Ticket
 ```bash
@@ -241,41 +285,57 @@ curl -X GET http://localhost:5000/customers/
 curl -X GET "http://localhost:5000/customers/?page=2&per_page=5"
 ```
 
+### Get All Inventory Items
+```bash
+curl -X GET http://localhost:5000/inventory/
+```
+
 ## Database Models
 
 ### Customer
 - `id`: Primary key
-- `first_name`: Customer's first name (required)
-- `last_name`: Customer's last name (required)
-- `email`: Customer's email (required, unique)
-- `phone`: Customer's phone number
-- `address`: Customer's address
+- `first_name`: Customer's first name (required, 1-50 chars)
+- `last_name`: Customer's last name (required, 1-50 chars)
+- `email`: Customer's email (required, unique, valid email format)
+- `phone`: Customer's phone number (max 20 chars)
+- `address`: Customer's address (max 200 chars)
 - `created_at`: Timestamp of creation
 
 ### Mechanic
 - `id`: Primary key
-- `first_name`: Mechanic's first name (required)
-- `last_name`: Mechanic's last name (required)
-- `email`: Mechanic's email (required, unique)
-- `phone`: Mechanic's phone number
-- `specialty`: Mechanic's area of expertise
-- `hourly_rate`: Mechanic's hourly billing rate
+- `first_name`: Mechanic's first name (required, 1-50 chars)
+- `last_name`: Mechanic's last name (required, 1-50 chars)
+- `email`: Mechanic's email (required, unique, valid email format)
+- `phone`: Mechanic's phone number (max 20 chars)
+- `specialty`: Mechanic's area of expertise (max 100 chars)
+- `hourly_rate`: Mechanic's hourly billing rate (min 0)
 - `hire_date`: Date mechanic was hired
+- `created_at`: Timestamp of creation
+
+### Inventory
+- `id`: Primary key
+- `name`: Part/supply name (required, 1-100 chars)
+- `price`: Part/supply price (required, min 0)
 - `created_at`: Timestamp of creation
 
 ### ServiceTicket
 - `id`: Primary key
 - `customer_id`: Foreign key to Customer (required)
-- `vehicle_year`: Year of the vehicle
-- `vehicle_make`: Make of the vehicle
-- `vehicle_model`: Model of the vehicle
-- `vehicle_vin`: Vehicle identification number
-- `description`: Description of work needed (required)
-- `estimated_cost`: Estimated cost of repairs
-- `actual_cost`: Actual cost of repairs
+- `vehicle_year`: Year of the vehicle (1900-2050)
+- `vehicle_make`: Make of the vehicle (max 50 chars)
+- `vehicle_model`: Model of the vehicle (max 50 chars)
+- `vehicle_vin`: Vehicle identification number (max 17 chars)
+- `description`: Description of work needed (required, min 1 char)
+- `estimated_cost`: Estimated cost of repairs (min 0)
+- `actual_cost`: Actual cost of repairs (min 0)
 - `status`: Ticket status (Open, In Progress, Completed, Cancelled)
 - `created_at`: Timestamp of creation
-- `completed_at`: Timestamp when completed
+- `completed_at`: Timestamp when completed (auto-set when status = Completed)
+
+### Relationships
+- **Many-to-Many**: ServiceTicket ↔ Mechanic (service_ticket_mechanics table)
+- **Many-to-Many**: ServiceTicket ↔ Inventory (service_ticket_inventory table)
+- **One-to-Many**: Customer → ServiceTicket
 
 ## Testing with Postman
 
@@ -306,14 +366,29 @@ Import the following collection structure in Postman:
    - Get Customer Tickets
    - Get Mechanic Tickets
 
-## Development Notes
+## Architecture & Development Notes
 
-- The API uses SQLAlchemy for database operations
-- Marshmallow provides serialization and validation
-- Flask-Migrate can be used for database migrations
-- Flask-Limiter provides rate limiting protection
-- Flask-Caching improves performance with in-memory caching
-- The application follows the Application Factory pattern for better testability and modularity
-- Each blueprint is self-contained with its own routes and schemas
-- Rate limiting is implemented per IP address using `get_remote_address`
-- Caching uses SimpleCache (in-memory) for development; consider Redis for production
+### Clean Architecture
+- **Application Factory Pattern**: Modular Flask app creation with `create_app()`
+- **Blueprint Organization**: Each feature (customer, mechanic, inventory, service_ticket) is self-contained
+- **Schema Validation**: Comprehensive Marshmallow schemas with custom validations and error handling
+- **No Duplicate Code**: Eliminated duplicate models, schemas, and blueprint files
+
+### Technology Stack
+- **Flask & Extensions**: SQLAlchemy (ORM), Marshmallow (serialization), Flask-Migrate (migrations)
+- **Performance**: Flask-Limiter (rate limiting), Flask-Caching (caching), proper database relationships
+- **Security**: Token-based authentication, input validation, SQL injection protection
+- **Database**: Supports MySQL (production) and SQLite (development)
+
+### Key Features
+- **Rate Limiting**: Per-IP limits prevent API abuse
+- **Caching**: In-memory caching improves response times (consider Redis for production)
+- **Validation**: Comprehensive input validation with custom field validators
+- **Error Handling**: Proper HTTP status codes and error messages
+- **Database Design**: Efficient many-to-many relationships with association tables
+
+### Project Cleanup Completed
+- ✅ Removed duplicate root `schemas.py`, `models.py`, and `blueprints/` folder
+- ✅ Consolidated all schemas into their respective blueprint modules
+- ✅ Fixed conflicting blueprint registrations
+- ✅ Maintained single source of truth for all components
